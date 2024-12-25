@@ -190,7 +190,7 @@ public:
 
       uint64_t maskblock = block_size - 1;
       for (uint32_t i = 0; i < keys.size(); i++) {
-        const uint64_t hash = bff_utils::mix256(keys[i].keys, seed);
+        const uint64_t hash = bff_utils::mix256(keys[i].words, seed);
 
         uint64_t segment_index = hash >> (64 - block_bits);
         while (reverseOrder[startPos[segment_index]] != 0) {
@@ -317,11 +317,10 @@ public:
       h012[3] = h012[0];
       h012[4] = h012[1];
 
-      const uint32_t entry =
-        ((value % (uint32_t)plaintext_modulo) - fingerprints[h012[found + 1]] - fingerprints[h012[found + 2]]) % (uint32_t)plaintext_modulo;
-      const uint32_t mask = (uint32_t)(bff_utils::mix(hash, label) % plaintext_modulo);
+      const uint32_t entry = ((value % plaintext_modulo) - fingerprints[h012[found + 1]] - fingerprints[h012[found + 2]]) % plaintext_modulo;
+      const uint32_t mask = bff_utils::mix(hash, label) % plaintext_modulo;
 
-      fingerprints[h012[found]] = (entry - mask) % (uint32_t)plaintext_modulo;
+      fingerprints[h012[found]] = (entry - mask) % plaintext_modulo;
     }
 
     return true;
@@ -329,13 +328,13 @@ public:
 
   uint32_t recover(const bff_utils::bff_key_t key)
   {
-    const uint64_t hash = bff_utils::mix256(key.keys, seed);
+    const uint64_t hash = bff_utils::mix256(key.words, seed);
     const auto [h0, h1, h2] = hash_batch(hash);
 
     const uint32_t data = fingerprints[h0] + fingerprints[h1] + fingerprints[h2];
-    const uint32_t mask = (uint32_t)(bff_utils::mix(hash, label) % plaintext_modulo);
+    const uint32_t mask = bff_utils::mix(hash, label) % plaintext_modulo;
 
-    return (data + mask) % (uint32_t)plaintext_modulo;
+    return (data + mask) % plaintext_modulo;
   }
 
   std::vector<uint32_t> get_fingerprints_mod_p() const
@@ -352,7 +351,7 @@ public:
 
   std::array<uint32_t, 3> get_hash_evals(const bff_utils::bff_key_t key) const
   {
-    const auto hash = bff_utils::mix256(key.keys, seed);
+    const auto hash = bff_utils::mix256(key.words, seed);
     const auto [h0, h1, h2] = hash_batch(hash);
 
     return { h0, h1, h2 };
@@ -360,7 +359,7 @@ public:
 
   uint64_t get_key_fingerprint(const bff_utils::bff_key_t key) const
   {
-    const auto hash = bff_utils::mix256(key.keys, seed);
+    const auto hash = bff_utils::mix256(key.words, seed);
     return bff_utils::mix(hash, label);
   }
 
