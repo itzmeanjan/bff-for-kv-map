@@ -18,6 +18,9 @@ struct binary_fuse_filter_Zp32_t
 {
 private:
   std::array<uint8_t, 32> seed{};
+  uint64_t plaintext_modulo;
+  uint64_t label;
+
   uint32_t segment_length;
   uint32_t segment_length_mask;
   uint32_t segment_count;
@@ -62,6 +65,12 @@ public:
     std::copy_n(buffer.subspan(buffer_offset).begin(), seed.size(), seed.begin());
     buffer_offset += seed.size();
 
+    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(plaintext_modulo), reinterpret_cast<uint8_t*>(&plaintext_modulo));
+    buffer_offset += sizeof(plaintext_modulo);
+
+    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(label), reinterpret_cast<uint8_t*>(&label));
+    buffer_offset += sizeof(label);
+
     std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(segment_length), reinterpret_cast<uint8_t*>(&segment_length));
     buffer_offset += sizeof(segment_length);
 
@@ -93,8 +102,8 @@ public:
 
   size_t serialized_num_bytes()
   {
-    return sizeof(seed) + sizeof(segment_length) + sizeof(segment_length_mask) + sizeof(segment_count) + sizeof(segment_count_length) + sizeof(array_length) +
-           (fingerprints.size() * sizeof(uint32_t));
+    return sizeof(seed) + sizeof(plaintext_modulo) + sizeof(label) + sizeof(segment_length) + sizeof(segment_length_mask) + sizeof(segment_count) +
+           sizeof(segment_count_length) + sizeof(array_length) + (fingerprints.size() * sizeof(uint32_t));
   }
 
   bool serialize(std::span<uint8_t> buffer)
@@ -107,6 +116,12 @@ public:
     std::copy_n(seed.begin(), seed.size(), buffer.begin());
 
     buffer_offset += seed.size();
+    std::copy_n(reinterpret_cast<const uint8_t*>(&plaintext_modulo), sizeof(plaintext_modulo), buffer.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(plaintext_modulo);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&label), sizeof(label), buffer.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(label);
     std::copy_n(reinterpret_cast<const uint8_t*>(&segment_length), sizeof(segment_length), buffer.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(segment_length);
@@ -129,6 +144,9 @@ public:
                  const uint64_t plaintext_modulo,
                  const uint64_t label)
   {
+    this->plaintext_modulo = plaintext_modulo;
+    this->label = label;
+
     if (keys.size() != values.size()) [[unlikely]] {
       return false;
     }
@@ -309,7 +327,7 @@ public:
     return true;
   }
 
-  uint32_t recover(const bff_utils::bff_key_t key, const uint64_t plaintext_modulo, const uint64_t label)
+  uint32_t recover(const bff_utils::bff_key_t key)
   {
     const uint64_t hash = bff_utils::mix256(key.keys, seed);
     const auto [h0, h1, h2] = hash_batch(hash);
