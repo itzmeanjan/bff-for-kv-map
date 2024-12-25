@@ -124,12 +124,18 @@ public:
     return true;
   }
 
-  bool construct(std::span<const bff_utils::bff_key_t> keys, std::span<const uint32_t> values, const uint64_t plaintext_modulo, const uint64_t label)
+  bool construct(std::span<const bff_utils::bff_key_t> keys, // 256 -bit keys
+                 std::span<const uint32_t> values,           // Corresponding values s.t. ∈ [0,plaintext_modulo)
+                 const uint64_t plaintext_modulo,
+                 const uint64_t label)
   {
     if (keys.size() != values.size()) [[unlikely]] {
       return false;
     }
     if (!bff_utils::are_all_keys_distinct(keys)) [[unlikely]] {
+      return false;
+    }
+    if (plaintext_modulo < 256) [[unlikely]] {
       return false;
     }
 
@@ -184,7 +190,7 @@ public:
       uint32_t duplicates = 0;
       for (uint32_t i = 0; i < keys.size(); i++) {
         const uint64_t hash = reverseOrder[i];
-        const auto [h0, h1, h2] = binary_fusep32_hash_batch(hash);
+        const auto [h0, h1, h2] = hash_batch(hash);
 
         t2count[h0] += 4;
         t2hash[h0] ^= hash;
@@ -245,7 +251,7 @@ public:
           reverseOrder[stacksize] = hash;
           stacksize++;
 
-          const auto [h0, h1, h2] = binary_fusep32_hash_batch(hash);
+          const auto [h0, h1, h2] = hash_batch(hash);
 
           h012[1] = h1;
           h012[2] = h2;
@@ -284,7 +290,7 @@ public:
       const uint64_t hash = reverseOrder[i];
       const uint32_t value = hm_keys[hash];
 
-      const auto [h0, h1, h2] = binary_fusep32_hash_batch(hash);
+      const auto [h0, h1, h2] = hash_batch(hash);
 
       const uint8_t found = reverseH[i];
       h012[0] = h0;
@@ -306,7 +312,7 @@ public:
   uint32_t recover(const bff_utils::bff_key_t key, const uint64_t plaintext_modulo, const uint64_t label)
   {
     const uint64_t hash = bff_utils::mix256(key.keys, seed);
-    const auto [h0, h1, h2] = binary_fusep32_hash_batch(hash);
+    const auto [h0, h1, h2] = hash_batch(hash);
 
     const uint32_t data = fingerprints[h0] + fingerprints[h1] + fingerprints[h2];
     const uint32_t mask = (uint32_t)(bff_utils::mix(hash, label) % plaintext_modulo);
@@ -315,7 +321,7 @@ public:
   }
 
 private:
-  constexpr uint32_t binary_fusep32_hash(uint64_t index, uint64_t hash) const
+  constexpr uint32_t hash(uint64_t index, uint64_t hash) const
   {
     uint64_t h = bff_utils::mulhi(hash, this->segment_count_length);
     h += index * this->segment_length;
@@ -329,7 +335,7 @@ private:
     return (uint32_t)h;
   }
 
-  constexpr std::tuple<uint32_t, uint32_t, uint32_t> binary_fusep32_hash_batch(const uint64_t hash) const
+  constexpr std::tuple<uint32_t, uint32_t, uint32_t> hash_batch(const uint64_t hash) const
   {
     const uint64_t hi = bff_utils::mulhi(hash, this->segment_count_length);
 
