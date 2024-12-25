@@ -11,8 +11,10 @@ namespace bff_utils {
 
 struct bff_key_t
 {
+public:
   std::array<uint64_t, 4> keys{};
 
+  bff_key_t() = default;
   auto operator<=>(const auto& rhs) const
   {
     return std::lexicographical_compare_three_way(this->keys.begin(), this->keys.end(), rhs.keys.begin(), rhs.keys.end());
