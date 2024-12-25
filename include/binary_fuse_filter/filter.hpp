@@ -62,18 +62,18 @@ public:
     std::copy_n(buffer.subspan(buffer_offset).begin(), seed.size(), seed.begin());
     buffer_offset += seed.size();
 
-    std::memcpy(reinterpret_cast<uint8_t*>(&segment_length), buffer.data() + buffer_offset, sizeof(segment_length));
+    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(segment_length), reinterpret_cast<uint8_t*>(&segment_length));
     buffer_offset += sizeof(segment_length);
 
     segment_length_mask = segment_length - 1;
 
-    std::memcpy(reinterpret_cast<uint8_t*>(&segment_count), buffer.data() + buffer_offset, sizeof(segment_count));
+    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(segment_count), reinterpret_cast<uint8_t*>(&segment_count));
     buffer_offset += sizeof(segment_count);
 
-    std::memcpy(reinterpret_cast<uint8_t*>(&segment_count_length), buffer.data() + buffer_offset, sizeof(segment_count_length));
+    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(segment_count_length), reinterpret_cast<uint8_t*>(&segment_count_length));
     buffer_offset += sizeof(segment_count_length);
 
-    std::memcpy(reinterpret_cast<uint8_t*>(&array_length), buffer.data() + buffer_offset, sizeof(array_length));
+    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(array_length), reinterpret_cast<uint8_t*>(&array_length));
     buffer_offset += sizeof(array_length);
 
     fingerprints = std::vector<uint32_t>(array_length, 0);
@@ -104,22 +104,22 @@ public:
     }
 
     size_t buffer_offset = 0;
-    memcpy(buffer.data(), seed.data(), seed.size());
+    std::copy_n(seed.begin(), seed.size(), buffer.begin());
 
     buffer_offset += seed.size();
-    memcpy(buffer.data() + buffer_offset, reinterpret_cast<uint8_t*>(&segment_length), sizeof(segment_length));
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_length), sizeof(segment_length), buffer.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(segment_length);
-    memcpy(buffer.data() + buffer_offset, reinterpret_cast<uint8_t*>(&segment_count), sizeof(segment_count));
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count), sizeof(segment_count), buffer.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(segment_count);
-    memcpy(buffer.data() + buffer_offset, reinterpret_cast<uint8_t*>(&segment_count_length), sizeof(segment_count_length));
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count_length), sizeof(segment_count_length), buffer.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(segment_count_length);
-    memcpy(buffer.data() + buffer_offset, reinterpret_cast<uint8_t*>(&array_length), sizeof(array_length));
+    std::copy_n(reinterpret_cast<const uint8_t*>(&array_length), sizeof(array_length), buffer.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(array_length);
-    memcpy(buffer.data() + buffer_offset, fingerprints.data(), array_length * sizeof(uint32_t));
+    std::copy_n(reinterpret_cast<const uint8_t*>(fingerprints.data()), array_length * sizeof(uint32_t), buffer.subspan(buffer_offset).begin());
 
     return true;
   }
@@ -156,7 +156,7 @@ public:
     std::unordered_map<uint64_t, uint32_t> hm_keys{};
 
     for (size_t loop = 0; true; loop++) {
-      if ((loop + 1) > MAX_BFF_CREATE_ATTEMPT_COUNT) {
+      if ((loop + 1) > MAX_BFF_CREATE_ATTEMPT_COUNT) [[unlikely]] {
         return false;
       }
 
