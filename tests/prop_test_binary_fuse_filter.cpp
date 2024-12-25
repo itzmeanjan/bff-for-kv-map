@@ -42,3 +42,31 @@ TEST(BinaryFuseFilter, CreateFilterAndRecoverValuesWhenQueriedUsingKeys)
     EXPECT_EQ(values[i], recovered);
   }
 }
+
+TEST(BinaryFuseFilter, SerializeAndDeserializeFilter)
+{
+  constexpr size_t size = 100'000;
+  constexpr uint64_t plaintext_modulo = 1024;
+  constexpr uint64_t label = 1;
+
+  std::vector<bff_utils::bff_key_t> keys(size);
+  std::vector<uint32_t> values(size, 0);
+
+  generate_random_keys_and_values(keys, values, plaintext_modulo);
+
+  binary_fuse_filter_Zp32_t filter(size);
+  EXPECT_TRUE(filter.construct(keys, values, plaintext_modulo, label));
+
+  std::vector<uint8_t> filter_as_bytes(filter.serialized_num_bytes());
+  EXPECT_TRUE(filter.serialize(filter_as_bytes));
+
+  binary_fuse_filter_Zp32_t filter_from_bytes(filter_as_bytes);
+
+  for (size_t i = 0; i < size; i++) {
+    const uint32_t recovered_filter1 = filter.recover(keys[i], plaintext_modulo, label);
+    const uint32_t recovered_filter2 = filter_from_bytes.recover(keys[i], plaintext_modulo, label);
+
+    EXPECT_EQ(recovered_filter1, recovered_filter2);
+    EXPECT_EQ(values[i], recovered_filter1);
+  }
+}
