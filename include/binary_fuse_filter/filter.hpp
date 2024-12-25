@@ -350,12 +350,18 @@ public:
     return result;
   }
 
-  std::array<uint32_t, 3> get_hash_evals(const bff_utils::bff_key_t key)
+  std::array<uint32_t, 3> get_hash_evals(const bff_utils::bff_key_t key) const
   {
     const auto hash = bff_utils::mix256(key.keys, seed);
     const auto [h0, h1, h2] = hash_batch(hash);
 
     return { h0, h1, h2 };
+  }
+
+  uint64_t get_key_fingerprint(const bff_utils::bff_key_t key) const
+  {
+    const auto hash = bff_utils::mix256(key.keys, seed);
+    return bff_utils::mix(hash, label);
   }
 
 private:
