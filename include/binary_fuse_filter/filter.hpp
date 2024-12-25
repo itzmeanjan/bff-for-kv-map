@@ -40,7 +40,7 @@ public:
     segment_length_mask = segment_length - 1;
 
     const double sizeFactor = size <= 1 ? 0 : bff_utils::calculate_size_factor(arity, size);
-    const uint32_t capacity = size <= 1 ? 0 : (uint32_t)(round((double)size * sizeFactor));
+    const uint32_t capacity = size <= 1 ? 0 : static_cast<uint32_t>(round(static_cast<double>(size) * sizeFactor));
     const uint32_t initSegmentCount = (capacity + segment_length - 1) / segment_length - (arity - 1);
 
     array_length = (initSegmentCount + arity - 1) * segment_length;
@@ -167,11 +167,11 @@ public:
     std::vector<uint64_t> t2hash(capacity, 0);
 
     uint32_t block_bits = 1;
-    while (((uint32_t)1 << block_bits) < segment_count) {
+    while ((1U << block_bits) < segment_count) {
       block_bits += 1;
     }
 
-    const uint32_t block_size = ((uint32_t)1 << block_bits);
+    const uint32_t block_size = 1U << block_bits;
     std::vector<uint32_t> startPos(block_size, 0);
 
     std::array<uint32_t, 5> h012{};
@@ -185,7 +185,7 @@ public:
       }
 
       for (uint32_t i = 0; i < block_size; i++) {
-        startPos[i] = (uint32_t)(((uint64_t)i * keys.size()) >> block_bits);
+        startPos[i] = static_cast<uint32_t>((static_cast<uint64_t>(i) * keys.size()) >> block_bits);
       }
 
       uint64_t maskblock = block_size - 1;

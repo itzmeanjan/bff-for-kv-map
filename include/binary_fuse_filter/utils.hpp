@@ -39,7 +39,7 @@ are_all_keys_distinct(std::span<const bff_key_t> keys)
 static constexpr uint32_t
 fingerprint(const uint64_t hash)
 {
-  return (uint32_t)(hash ^ (hash >> 32U));
+  return static_cast<uint32_t>(hash ^ (hash >> 32U));
 }
 
 static constexpr uint32_t
@@ -47,11 +47,13 @@ calculate_segment_length(const uint32_t arity, const uint32_t size)
 {
   // These parameters are very sensitive. Replacing 'floor' by 'round' can substantially affect the construction time.
   if (arity == 3) {
-    return ((uint32_t)1) << (unsigned)(floor(log((double)(size)) / log(3.33) + 2.25));
+    return 1U << static_cast<uint32_t>(floor(log(static_cast<double>(size)) / log(3.33) + 2.25));
   }
+
   if (arity == 4) {
-    return ((uint32_t)1) << (unsigned)(floor(log((double)(size)) / log(2.91) - 0.5));
+    return 1U << static_cast<uint32_t>(floor(log(static_cast<double>(size)) / log(2.91) - 0.5));
   }
+
   return 65536;
 }
 
@@ -59,11 +61,13 @@ static constexpr double
 calculate_size_factor(const uint32_t arity, const uint32_t size)
 {
   if (arity == 3) {
-    return std::max(1.125, 0.875 + 0.25 * log(1000000.0) / log((double)size));
+    return std::max(1.125, 0.875 + 0.25 * log(1000000.0) / log(static_cast<double>(size)));
   }
+
   if (arity == 4) {
-    return std::max(1.075, 0.77 + 0.305 * log(600000.0) / log((double)size));
+    return std::max(1.075, 0.77 + 0.305 * log(600000.0) / log(static_cast<double>(size)));
   }
+
   return 2.0;
 }
 
@@ -77,9 +81,9 @@ static constexpr uint64_t
 murmur64(uint64_t h)
 {
   h ^= h >> 33U;
-  h *= UINT64_C(0xff51afd7ed558ccd);
+  h *= 0xff51afd7ed558ccdUL;
   h ^= h >> 33U;
-  h *= UINT64_C(0xc4ceb9fe1a85ec53);
+  h *= 0xc4ceb9fe1a85ec53UL;
   h ^= h >> 33U;
 
   return h;
@@ -107,11 +111,12 @@ mix256(std::span<const uint64_t, 4> key, std::span<const uint8_t, 32> seed)
 
     mixed_outer += mixed_inner;
   }
+
   return mixed_outer;
 }
 
 static constexpr uint64_t
-mulhi(uint64_t a, uint64_t b)
+mulhi(const uint64_t a, const uint64_t b)
 {
 #ifdef __SIZEOF_INT128__
 
