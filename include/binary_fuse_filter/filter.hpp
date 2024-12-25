@@ -338,6 +338,18 @@ public:
     return (data + mask) % (uint32_t)plaintext_modulo;
   }
 
+  std::vector<uint32_t> get_fingerprints_mod_p() const
+  {
+    std::vector<uint32_t> result;
+    result.reserve(fingerprints.size());
+
+    for (const auto f : fingerprints) {
+      result.push_back(f % static_cast<uint32_t>(plaintext_modulo));
+    }
+
+    return result;
+  }
+
 private:
   constexpr uint32_t hash(uint64_t index, uint64_t hash) const
   {
