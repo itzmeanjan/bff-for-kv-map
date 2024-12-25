@@ -38,7 +38,7 @@ TEST(BinaryFuseFilter, CreateFilterAndRecoverValuesWhenQueriedUsingKeys)
   EXPECT_TRUE(filter.construct(keys, values, plaintext_modulo, label));
 
   for (size_t i = 0; i < size; i++) {
-    const uint32_t recovered = filter.recover(keys[i], plaintext_modulo, label);
+    const uint32_t recovered = filter.recover(keys[i]);
     EXPECT_EQ(values[i], recovered);
   }
 }
@@ -63,8 +63,8 @@ TEST(BinaryFuseFilter, SerializeAndDeserializeFilter)
   binary_fuse_filter_Zp32_t filter_from_bytes(filter_as_bytes);
 
   for (size_t i = 0; i < size; i++) {
-    const uint32_t recovered_filter1 = filter.recover(keys[i], plaintext_modulo, label);
-    const uint32_t recovered_filter2 = filter_from_bytes.recover(keys[i], plaintext_modulo, label);
+    const uint32_t recovered_filter1 = filter.recover(keys[i]);
+    const uint32_t recovered_filter2 = filter_from_bytes.recover(keys[i]);
 
     EXPECT_EQ(recovered_filter1, recovered_filter2);
     EXPECT_EQ(values[i], recovered_filter1);
