@@ -1,6 +1,5 @@
 #pragma once
 #include "binary_fuse_filter/utils.hpp"
-#include <gtest/gtest.h>
 #include <random>
 
 // Generates random keys and values for testing purposes.
