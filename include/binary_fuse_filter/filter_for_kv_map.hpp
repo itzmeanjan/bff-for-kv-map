@@ -21,7 +21,7 @@ struct bff_for_kv_map_t
 private:
   std::array<uint8_t, 32> seed{};
 
-  uint32_t total_num_keys;
+  uint32_t num_keys_in_kv_map;
   uint64_t plaintext_modulo;
   uint64_t label;
 
@@ -33,20 +33,19 @@ private:
   std::vector<uint32_t> fingerprints;
 
 public:
-  bff_for_kv_map_t(const uint32_t size)
+  bff_for_kv_map_t(const uint32_t num_keys)
   {
-    total_num_keys = size;
-
     constexpr uint32_t arity = 3;
-    segment_length = size == 0 ? 4 : bff_kv_map_utils::calculate_segment_length(arity, size);
+    segment_length = num_keys == 0 ? 4 : bff_kv_map_utils::calculate_segment_length(arity, num_keys);
     if (segment_length > 262144) {
       segment_length = 262144;
     }
 
+    this->num_keys_in_kv_map = num_keys;
     segment_length_mask = segment_length - 1;
 
-    const double sizeFactor = size <= 1 ? 0 : bff_kv_map_utils::calculate_size_factor(arity, size);
-    const uint32_t capacity = size <= 1 ? 0 : static_cast<uint32_t>(round(static_cast<double>(size) * sizeFactor));
+    const double sizeFactor = num_keys <= 1 ? 0 : bff_kv_map_utils::calculate_size_factor(arity, num_keys);
+    const uint32_t capacity = num_keys <= 1 ? 0 : static_cast<uint32_t>(round(static_cast<double>(num_keys) * sizeFactor));
     const uint32_t initSegmentCount = (capacity + segment_length - 1) / segment_length - (arity - 1);
 
     array_length = (initSegmentCount + arity - 1) * segment_length;
@@ -64,43 +63,48 @@ public:
     fingerprints = std::vector<uint32_t>(array_length, 0);
   }
 
-  bff_for_kv_map_t(std::span<const uint8_t> buffer)
+  bff_for_kv_map_t(std::span<const uint8_t> bytes)
   {
     size_t buffer_offset = 0;
 
-    std::copy_n(buffer.subspan(buffer_offset).begin(), seed.size(), seed.begin());
+    std::copy_n(bytes.subspan(buffer_offset).begin(), seed.size(), seed.begin());
     buffer_offset += seed.size();
 
-    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(total_num_keys), reinterpret_cast<uint8_t*>(&total_num_keys));
-    buffer_offset += sizeof(total_num_keys);
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(num_keys_in_kv_map), reinterpret_cast<uint8_t*>(&num_keys_in_kv_map));
+    buffer_offset += sizeof(num_keys_in_kv_map);
 
-    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(plaintext_modulo), reinterpret_cast<uint8_t*>(&plaintext_modulo));
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(plaintext_modulo), reinterpret_cast<uint8_t*>(&plaintext_modulo));
     buffer_offset += sizeof(plaintext_modulo);
 
-    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(label), reinterpret_cast<uint8_t*>(&label));
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(label), reinterpret_cast<uint8_t*>(&label));
     buffer_offset += sizeof(label);
 
-    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(segment_length), reinterpret_cast<uint8_t*>(&segment_length));
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_length), reinterpret_cast<uint8_t*>(&segment_length));
     buffer_offset += sizeof(segment_length);
 
     segment_length_mask = segment_length - 1;
 
-    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(segment_count), reinterpret_cast<uint8_t*>(&segment_count));
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_count), reinterpret_cast<uint8_t*>(&segment_count));
     buffer_offset += sizeof(segment_count);
 
-    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(segment_count_length), reinterpret_cast<uint8_t*>(&segment_count_length));
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_count_length), reinterpret_cast<uint8_t*>(&segment_count_length));
     buffer_offset += sizeof(segment_count_length);
 
-    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(array_length), reinterpret_cast<uint8_t*>(&array_length));
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(array_length), reinterpret_cast<uint8_t*>(&array_length));
     buffer_offset += sizeof(array_length);
 
     fingerprints = std::vector<uint32_t>(array_length, 0);
-    std::copy_n(buffer.subspan(buffer_offset).begin(), array_length * sizeof(uint32_t), reinterpret_cast<uint8_t*>(fingerprints.data()));
+    std::copy_n(bytes.subspan(buffer_offset).begin(), array_length * sizeof(uint32_t), reinterpret_cast<uint8_t*>(fingerprints.data()));
   }
 
   ~bff_for_kv_map_t()
   {
     seed.fill(0);
+
+    num_keys_in_kv_map = 0;
+    plaintext_modulo = 0;
+    label = 0;
+
     segment_length = 0;
     segment_length_mask = 0;
     segment_count = 0;
@@ -109,46 +113,46 @@ public:
     fingerprints.clear();
   }
 
-  size_t bits_per_entry() const { return (fingerprints.size() * static_cast<size_t>(std::log2(plaintext_modulo))) / static_cast<size_t>(total_num_keys); }
+  size_t bits_per_entry() const { return (fingerprints.size() * static_cast<size_t>(std::log2(plaintext_modulo))) / static_cast<size_t>(num_keys_in_kv_map); }
 
   size_t serialized_num_bytes()
   {
-    return sizeof(seed) + sizeof(plaintext_modulo) + sizeof(label) + sizeof(segment_length) + sizeof(segment_length_mask) + sizeof(segment_count) +
+    return sizeof(seed) + sizeof(num_keys_in_kv_map) + sizeof(plaintext_modulo) + sizeof(label) + sizeof(segment_length) + sizeof(segment_count) +
            sizeof(segment_count_length) + sizeof(array_length) + (fingerprints.size() * sizeof(uint32_t));
   }
 
-  bool serialize(std::span<uint8_t> buffer)
+  bool serialize(std::span<uint8_t> bytes)
   {
-    if (buffer.size() != serialized_num_bytes()) [[unlikely]] {
+    if (bytes.size() != serialized_num_bytes()) [[unlikely]] {
       return false;
     }
 
     size_t buffer_offset = 0;
-    std::copy_n(seed.begin(), seed.size(), buffer.begin());
+    std::copy_n(seed.begin(), seed.size(), bytes.begin());
 
     buffer_offset += seed.size();
-    std::copy_n(reinterpret_cast<const uint8_t*>(&total_num_keys), sizeof(total_num_keys), buffer.subspan(buffer_offset).begin());
+    std::copy_n(reinterpret_cast<const uint8_t*>(&num_keys_in_kv_map), sizeof(num_keys_in_kv_map), bytes.subspan(buffer_offset).begin());
 
-    buffer_offset += sizeof(total_num_keys);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&plaintext_modulo), sizeof(plaintext_modulo), buffer.subspan(buffer_offset).begin());
+    buffer_offset += sizeof(num_keys_in_kv_map);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&plaintext_modulo), sizeof(plaintext_modulo), bytes.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(plaintext_modulo);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&label), sizeof(label), buffer.subspan(buffer_offset).begin());
+    std::copy_n(reinterpret_cast<const uint8_t*>(&label), sizeof(label), bytes.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(label);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_length), sizeof(segment_length), buffer.subspan(buffer_offset).begin());
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_length), sizeof(segment_length), bytes.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(segment_length);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count), sizeof(segment_count), buffer.subspan(buffer_offset).begin());
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count), sizeof(segment_count), bytes.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(segment_count);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count_length), sizeof(segment_count_length), buffer.subspan(buffer_offset).begin());
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count_length), sizeof(segment_count_length), bytes.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(segment_count_length);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&array_length), sizeof(array_length), buffer.subspan(buffer_offset).begin());
+    std::copy_n(reinterpret_cast<const uint8_t*>(&array_length), sizeof(array_length), bytes.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(array_length);
-    std::copy_n(reinterpret_cast<const uint8_t*>(fingerprints.data()), array_length * sizeof(uint32_t), buffer.subspan(buffer_offset).begin());
+    std::copy_n(reinterpret_cast<const uint8_t*>(fingerprints.data()), array_length * sizeof(uint32_t), bytes.subspan(buffer_offset).begin());
 
     return true;
   }
@@ -158,9 +162,9 @@ public:
                  const uint64_t plaintext_modulo,
                  const uint64_t label)
   {
-    this->plaintext_modulo = plaintext_modulo;
-    this->label = label;
-
+    if (num_keys_in_kv_map != keys.size()) [[unlikely]] {
+      return false;
+    }
     if (keys.size() != values.size()) [[unlikely]] {
       return false;
     }
@@ -171,13 +175,15 @@ public:
       return false;
     }
 
-    const uint32_t capacity = array_length;
-    size_t num_keys = keys.size();
+    this->plaintext_modulo = plaintext_modulo;
+    this->label = label;
 
-    std::vector<uint64_t> reverseOrder(keys.size() + 1, 0);
+    const uint32_t capacity = array_length;
+
+    std::vector<uint64_t> reverseOrder(num_keys_in_kv_map + 1, 0);
     std::vector<uint32_t> alone(capacity, 0);
     std::vector<uint8_t> t2count(capacity, 0);
-    std::vector<uint8_t> reverseH(keys.size(), 0);
+    std::vector<uint8_t> reverseH(num_keys_in_kv_map, 0);
     std::vector<uint64_t> t2hash(capacity, 0);
 
     uint32_t block_bits = 1;
@@ -189,7 +195,7 @@ public:
     std::vector<uint32_t> startPos(block_size, 0);
 
     std::array<uint32_t, 5> h012{};
-    reverseOrder[keys.size()] = 1;
+    reverseOrder[num_keys_in_kv_map] = 1;
 
     std::unordered_map<uint64_t, uint32_t> hm_keys{};
 
@@ -203,7 +209,7 @@ public:
       }
 
       uint64_t maskblock = block_size - 1;
-      for (uint32_t i = 0; i < keys.size(); i++) {
+      for (uint32_t i = 0; i < num_keys_in_kv_map; i++) {
         const uint64_t hash = bff_kv_map_utils::mix256(keys[i].words, seed);
 
         uint64_t segment_index = hash >> (64 - block_bits);
@@ -218,9 +224,8 @@ public:
         hm_keys[hash] = values[i];
       }
 
-      int error = 0;
-      uint32_t duplicates = 0;
-      for (uint32_t i = 0; i < keys.size(); i++) {
+      bool error = 0;
+      for (uint32_t i = 0; i < num_keys_in_kv_map; i++) {
         const uint64_t hash = reverseOrder[i];
         const auto [h0, h1, h2] = hash_batch(hash);
 
@@ -235,25 +240,7 @@ public:
         t2hash[h2] ^= hash;
         t2count[h2] ^= 2U;
 
-        if ((t2hash[h0] & t2hash[h1] & t2hash[h2]) == 0) {
-          if (((t2hash[h0] == 0) && (t2count[h0] == 8)) || ((t2hash[h1] == 0) && (t2count[h1] == 8)) || ((t2hash[h2] == 0) && (t2count[h2] == 8))) {
-            duplicates += 1;
-            t2count[h0] -= 4;
-            t2hash[h0] ^= hash;
-
-            t2count[h1] -= 4;
-            t2count[h1] ^= 1U;
-            t2hash[h1] ^= hash;
-
-            t2count[h2] -= 4;
-            t2count[h2] ^= 2U;
-            t2hash[h2] ^= hash;
-          }
-        }
-
-        error = (t2count[h0] < 4) ? 1 : error;
-        error = (t2count[h1] < 4) ? 1 : error;
-        error = (t2count[h2] < 4) ? 1 : error;
+        error = (t2count[h0] < 4) || (t2count[h1] < 4) || (t2count[h2] < 4);
       }
 
       if (error) {
@@ -308,8 +295,7 @@ public:
         }
       }
 
-      if ((stacksize + duplicates) == keys.size()) {
-        num_keys = stacksize;
+      if (stacksize == num_keys_in_kv_map) {
         break;
       }
 
@@ -318,7 +304,7 @@ public:
       std::fill(t2hash.begin(), t2hash.end(), 0);
     }
 
-    for (uint32_t i = num_keys - 1; i < num_keys; i--) {
+    for (uint32_t i = num_keys_in_kv_map - 1; i < num_keys_in_kv_map; i--) {
       const uint64_t hash = reverseOrder[i];
       const uint32_t value = hm_keys[hash];
 
