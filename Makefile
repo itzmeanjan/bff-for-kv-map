@@ -1,44 +1,33 @@
+.DEFAULT_GOAL := help
+
+# Collects inspiration from https://github.com/itzmeanjan/ascon/blob/644e5c0ee64da42e3c187adb84ba4c43925caf30/Makefile
+.PHONY: help
+help:
+	@for file in $(MAKEFILE_LIST); do \
+		grep -E '^[a-zA-Z_-]+:.*?## .*$$' $${file} | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}';\
+	done
+
+
 CXX ?= clang++
+CXX_DEFS +=
 CXX_FLAGS := -std=c++20
-WARN_FLAGS := -Wall -Wextra -pedantic
-OPT_FLAGS := -g -O2
+WARN_FLAGS := -Wall -Wextra -Wpedantic
+DEBUG_FLAGS := -O1 -g
+RELEASE_FLAGS := -O3 -march=native
+LINK_OPT_FLAGS := -flto
+
 I_FLAGS := -I ./include
-SANITIZER_FLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls
 
 SRC_DIR := include
-BINARY_FUSE_FILTER_SOURCES := $(shell find include -name *.hpp)
+BFF_FOR_KV_MAP_SOURCES := $(shell find $(SRC_DIR) -name '*.hpp')
 BUILD_DIR := build
 
-TEST_DIR := tests
-TEST_SOURCES := $(wildcard $(TEST_DIR)/*.cpp)
-TEST_BUILD_DIR := $(BUILD_DIR)/$(TEST_DIR)
-TEST_OBJECTS := $(addprefix $(TEST_BUILD_DIR)/, $(notdir $(patsubst %.cpp,%.o,$(TEST_SOURCES))))
-TEST_LINK_FLAGS := -lgtest -lgtest_main
-TEST_BINARY := $(TEST_BUILD_DIR)/test.out
+include tests/test.mk
 
-all: test
-
-$(BUILD_DIR):
-	mkdir -p $@
-
-$(TEST_BUILD_DIR): $(BUILD_DIR)
-	mkdir -p $@
-
-$(TEST_BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp $(TEST_BUILD_DIR)
-	$(CXX) $(CXX_FLAGS) $(WARN_FLAGS) $(OPT_FLAGS) $(I_FLAGS) $(SANITIZER_FLAGS) -c $< -o $@
-
-$(TEST_BINARY): $(TEST_OBJECTS)
-	$(CXX) $(OPT_FLAGS) $(SANITIZER_FLAGS) $^ $(TEST_LINK_FLAGS) -o $@
-
-test: $(TEST_BINARY)
-	ASAN_OPTIONS='halt_on_error=1:abort_on_error=1:print_summary=1' \
-	UBSAN_OPTIONS='halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1' \
-	./$<
-
-.PHONY: format clean
-
-clean:
+.PHONY: clean
+clean: ## Remove build directory
 	rm -rf $(BUILD_DIR)
 
-format: $(BINARY_FUSE_FILTER_SOURCES) $(TEST_SOURCES)
+.PHONY: format
+format: $(BFF_FOR_KV_MAP_SOURCES) $(TEST_SOURCES) $(TEST_HEADERS) ## Format source code
 	clang-format -i $^
