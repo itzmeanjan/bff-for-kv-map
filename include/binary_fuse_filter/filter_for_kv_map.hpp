@@ -12,9 +12,11 @@
 #include <unordered_map>
 #include <vector>
 
-constexpr size_t MAX_BFF_CREATE_ATTEMPT_COUNT = 100;
+namespace bff_kv_map {
 
-struct binary_fuse_filter_Zp32_t
+constexpr size_t BFF_FOR_KV_MAP_MAX_CREATE_ATTEMPT_COUNT = 100;
+
+struct bff_for_kv_map_t
 {
 private:
   std::array<uint8_t, 32> seed{};
@@ -31,19 +33,19 @@ private:
   std::vector<uint32_t> fingerprints;
 
 public:
-  binary_fuse_filter_Zp32_t(const uint32_t size)
+  bff_for_kv_map_t(const uint32_t size)
   {
     total_num_keys = size;
 
     constexpr uint32_t arity = 3;
-    segment_length = size == 0 ? 4 : bff_utils::calculate_segment_length(arity, size);
+    segment_length = size == 0 ? 4 : bff_kv_map_utils::calculate_segment_length(arity, size);
     if (segment_length > 262144) {
       segment_length = 262144;
     }
 
     segment_length_mask = segment_length - 1;
 
-    const double sizeFactor = size <= 1 ? 0 : bff_utils::calculate_size_factor(arity, size);
+    const double sizeFactor = size <= 1 ? 0 : bff_kv_map_utils::calculate_size_factor(arity, size);
     const uint32_t capacity = size <= 1 ? 0 : static_cast<uint32_t>(round(static_cast<double>(size) * sizeFactor));
     const uint32_t initSegmentCount = (capacity + segment_length - 1) / segment_length - (arity - 1);
 
@@ -62,7 +64,7 @@ public:
     fingerprints = std::vector<uint32_t>(array_length, 0);
   }
 
-  binary_fuse_filter_Zp32_t(std::span<const uint8_t> buffer)
+  bff_for_kv_map_t(std::span<const uint8_t> buffer)
   {
     size_t buffer_offset = 0;
 
@@ -96,7 +98,7 @@ public:
     std::copy_n(buffer.subspan(buffer_offset).begin(), array_length * sizeof(uint32_t), reinterpret_cast<uint8_t*>(fingerprints.data()));
   }
 
-  ~binary_fuse_filter_Zp32_t()
+  ~bff_for_kv_map_t()
   {
     seed.fill(0);
     segment_length = 0;
@@ -151,8 +153,8 @@ public:
     return true;
   }
 
-  bool construct(std::span<const bff_utils::bff_key_t> keys, // 256 -bit keys
-                 std::span<const uint32_t> values,           // Corresponding values s.t. ∈ [0,plaintext_modulo)
+  bool construct(std::span<const bff_kv_map_utils::bff_key_t> keys, // 256 -bit keys
+                 std::span<const uint32_t> values,                  // Corresponding values s.t. ∈ [0,plaintext_modulo)
                  const uint64_t plaintext_modulo,
                  const uint64_t label)
   {
@@ -162,7 +164,7 @@ public:
     if (keys.size() != values.size()) [[unlikely]] {
       return false;
     }
-    if (!bff_utils::are_all_keys_distinct(keys)) [[unlikely]] {
+    if (!bff_kv_map_utils::are_all_keys_distinct(keys)) [[unlikely]] {
       return false;
     }
     if (plaintext_modulo < 256) [[unlikely]] {
@@ -192,7 +194,7 @@ public:
     std::unordered_map<uint64_t, uint32_t> hm_keys{};
 
     for (size_t loop = 0; true; loop++) {
-      if ((loop + 1) > MAX_BFF_CREATE_ATTEMPT_COUNT) [[unlikely]] {
+      if ((loop + 1) > BFF_FOR_KV_MAP_MAX_CREATE_ATTEMPT_COUNT) [[unlikely]] {
         return false;
       }
 
@@ -202,7 +204,7 @@ public:
 
       uint64_t maskblock = block_size - 1;
       for (uint32_t i = 0; i < keys.size(); i++) {
-        const uint64_t hash = bff_utils::mix256(keys[i].words, seed);
+        const uint64_t hash = bff_kv_map_utils::mix256(keys[i].words, seed);
 
         uint64_t segment_index = hash >> (64 - block_bits);
         while (reverseOrder[startPos[segment_index]] != 0) {
@@ -293,7 +295,7 @@ public:
           Qsize += ((t2count[other_index1] >> 2U) == 2 ? 1U : 0U);
 
           t2count[other_index1] -= 4;
-          t2count[other_index1] ^= bff_utils::mod3(found + 1);
+          t2count[other_index1] ^= bff_kv_map_utils::mod3(found + 1);
           t2hash[other_index1] ^= hash;
 
           const uint32_t other_index2 = h012[found + 2];
@@ -301,7 +303,7 @@ public:
           Qsize += ((t2count[other_index2] >> 2U) == 2 ? 1U : 0U);
 
           t2count[other_index2] -= 4;
-          t2count[other_index2] ^= bff_utils::mod3(found + 2);
+          t2count[other_index2] ^= bff_kv_map_utils::mod3(found + 2);
           t2hash[other_index2] ^= hash;
         }
       }
@@ -330,7 +332,7 @@ public:
       h012[4] = h012[1];
 
       const uint32_t entry = ((value % plaintext_modulo) - fingerprints[h012[found + 1]] - fingerprints[h012[found + 2]]) % plaintext_modulo;
-      const uint32_t mask = bff_utils::mix(hash, label) % plaintext_modulo;
+      const uint32_t mask = bff_kv_map_utils::mix(hash, label) % plaintext_modulo;
 
       fingerprints[h012[found]] = (entry - mask) % plaintext_modulo;
     }
@@ -338,13 +340,13 @@ public:
     return true;
   }
 
-  uint32_t recover(const bff_utils::bff_key_t key)
+  uint32_t recover(const bff_kv_map_utils::bff_key_t key)
   {
-    const uint64_t hash = bff_utils::mix256(key.words, seed);
+    const uint64_t hash = bff_kv_map_utils::mix256(key.words, seed);
     const auto [h0, h1, h2] = hash_batch(hash);
 
     const uint32_t data = fingerprints[h0] + fingerprints[h1] + fingerprints[h2];
-    const uint32_t mask = bff_utils::mix(hash, label) % plaintext_modulo;
+    const uint32_t mask = bff_kv_map_utils::mix(hash, label) % plaintext_modulo;
 
     return (data + mask) % plaintext_modulo;
   }
@@ -361,24 +363,24 @@ public:
     return result;
   }
 
-  std::array<uint32_t, 3> get_hash_evals(const bff_utils::bff_key_t key) const
+  std::array<uint32_t, 3> get_hash_evals(const bff_kv_map_utils::bff_key_t key) const
   {
-    const auto hash = bff_utils::mix256(key.words, seed);
+    const auto hash = bff_kv_map_utils::mix256(key.words, seed);
     const auto [h0, h1, h2] = hash_batch(hash);
 
     return { h0, h1, h2 };
   }
 
-  uint64_t get_key_fingerprint(const bff_utils::bff_key_t key) const
+  uint64_t get_key_fingerprint(const bff_kv_map_utils::bff_key_t key) const
   {
-    const auto hash = bff_utils::mix256(key.words, seed);
-    return bff_utils::mix(hash, label);
+    const auto hash = bff_kv_map_utils::mix256(key.words, seed);
+    return bff_kv_map_utils::mix(hash, label);
   }
 
 private:
   constexpr uint32_t hash(uint64_t index, uint64_t hash) const
   {
-    uint64_t h = bff_utils::mulhi(hash, this->segment_count_length);
+    uint64_t h = bff_kv_map_utils::mulhi(hash, this->segment_count_length);
     h += index * this->segment_length;
 
     // keep the lower 36 bits
@@ -392,7 +394,7 @@ private:
 
   constexpr std::tuple<uint32_t, uint32_t, uint32_t> hash_batch(const uint64_t hash) const
   {
-    const uint64_t hi = bff_utils::mulhi(hash, this->segment_count_length);
+    const uint64_t hi = bff_kv_map_utils::mulhi(hash, this->segment_count_length);
 
     uint32_t h0 = 0, h1 = 0, h2 = 0;
 
@@ -405,3 +407,5 @@ private:
     return { h0, h1, h2 };
   }
 };
+
+}

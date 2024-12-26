@@ -7,7 +7,7 @@
 #include <set>
 #include <span>
 
-namespace bff_utils {
+namespace bff_kv_map_utils {
 
 struct bff_key_t
 {
