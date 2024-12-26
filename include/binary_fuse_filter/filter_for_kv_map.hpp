@@ -39,12 +39,14 @@ public:
   /**
    * @brief Construct a Binary Fuse Filter for Key-Value Map.
    *
+   * @param seed_bytes The seed bytes to use.
    * @param keys The keys of the Key-Value Map.
    * @param values The values of the Key-Value Map s.t. value ∈ [0,plaintext_modulo)
    * @param plaintext_modulo The plaintext modulo to use.
    * @param label The label to use.
    */
-  explicit bff_for_kv_map_t(std::span<const bff_kv_map_utils::bff_key_t> keys,
+  explicit bff_for_kv_map_t(std::span<const uint8_t, 32> seed_bytes,
+                            std::span<const bff_kv_map_utils::bff_key_t> keys,
                             std::span<const uint32_t> values,
                             const uint64_t plaintext_modulo,
                             const uint64_t label)
@@ -60,6 +62,7 @@ public:
     }
 
     num_keys_in_kv_map = keys.size();
+    std::copy(seed_bytes.begin(), seed_bytes.end(), this->seed.begin());
 
     constexpr uint32_t arity = 3;
     segment_length = num_keys_in_kv_map == 0 ? 4 : bff_kv_map_utils::calculate_segment_length(arity, num_keys_in_kv_map);
@@ -91,14 +94,14 @@ public:
     this->label = label;
 
     std::vector<uint64_t> reverseOrder(num_keys_in_kv_map + 1, 0);
+    std::vector<uint8_t> reverseH(num_keys_in_kv_map, 0);
     std::vector<uint32_t> alone(array_length, 0);
     std::vector<uint8_t> t2count(array_length, 0);
-    std::vector<uint8_t> reverseH(num_keys_in_kv_map, 0);
     std::vector<uint64_t> t2hash(array_length, 0);
 
     uint32_t block_bits = 1;
     while ((1U << block_bits) < segment_count) {
-      block_bits += 1;
+      block_bits++;
     }
 
     const uint32_t block_size = 1U << block_bits;
@@ -115,12 +118,12 @@ public:
       }
 
       for (uint32_t i = 0; i < block_size; i++) {
-        startPos[i] = static_cast<uint32_t>((static_cast<uint64_t>(i) * keys.size()) >> block_bits);
+        startPos[i] = static_cast<uint32_t>((static_cast<uint64_t>(i) * static_cast<uint64_t>(num_keys_in_kv_map)) >> block_bits);
       }
 
       uint64_t maskblock = block_size - 1;
       for (uint32_t i = 0; i < num_keys_in_kv_map; i++) {
-        const uint64_t hash = bff_kv_map_utils::mix256(keys[i].words, seed);
+        const uint64_t hash = bff_kv_map_utils::mix256(keys[i].words, seed_bytes);
 
         uint64_t segment_index = hash >> (64 - block_bits);
         while (reverseOrder[startPos[segment_index]] != 0) {
