@@ -3,7 +3,7 @@ CXX_FLAGS := -std=c++20
 WARN_FLAGS := -Wall -Wextra -pedantic
 OPT_FLAGS := -g -O2
 I_FLAGS := -I ./include
-SANITIZER_FLAGS := -fsanitize=address,leak,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls
+SANITIZER_FLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls
 
 SRC_DIR := include
 BINARY_FUSE_FILTER_SOURCES := $(shell find include -name *.hpp)
