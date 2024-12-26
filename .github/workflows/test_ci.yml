@@ -1,5 +1,5 @@
 # Taken from https://github.com/itzmeanjan/ascon/blob/644e5c0ee64da42e3c187adb84ba4c43925caf30/.github/workflows/test_ci.yml
-name: Test Binary Fuse Filter over Zp
+name: Test Binary Fuse Filter for Key-Value Map
 
 on:
   push:
@@ -14,6 +14,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         compiler: [g++, clang++]
+        build_type: [debug, release]
+        test_type: [standard, asan, ubsan]
       max-parallel: 4
 
     steps:
@@ -25,6 +27,21 @@ jobs:
           tag: v1.15.2
 
 
-      - name: Build and Test (${{ matrix.os }}, ${{ matrix.compiler }})
+      - name: Build and Test (${{ matrix.os }}, ${{ matrix.compiler }}, ${{ matrix.build_type }}, ${{ matrix.test_type }})
         run: |
-          CXX=${{ matrix.compiler }} make -j
+          CXX=${{ matrix.compiler }}
+          if [[ ${{ matrix.test_type }} == "standard" ]]; then
+            make test -j 2>&1 | tee build.log
+          else
+            make ${{ matrix.build_type }}_${{ matrix.test_type }}_test -j 2>&1 | tee build.log
+          fi
+          if [ $? -ne 0 ]; then
+            echo "Build or Test Failed! See build.log for details."
+            exit 1
+          fi
+
+      - name: Upload Build Log
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-log-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-${{ matrix.test_type }}
+          path: build.log
