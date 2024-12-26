@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 // Tests that a filter can be created, and that querying it with keys returns the correct values.
-TEST(BinaryFuseFilter, CreateFilterAndRecoverValuesWhenQueriedUsingKeys)
+TEST(BinaryFuseFilterForKVMap, CreateFilterAndRecoverValuesWhenQueriedUsingKeys)
 {
   constexpr size_t size = 100'000;
   constexpr uint64_t plaintext_modulo = 1024;
@@ -25,7 +25,7 @@ TEST(BinaryFuseFilter, CreateFilterAndRecoverValuesWhenQueriedUsingKeys)
 }
 
 // Tests that a filter can be serialized and deserialized, and that querying it with keys returns the correct values.
-TEST(BinaryFuseFilter, SerializeAndDeserializeFilter)
+TEST(BinaryFuseFilterForKVMap, SerializeAndDeserializeFilter)
 {
   constexpr size_t size = 100'000;
   constexpr uint64_t plaintext_modulo = 1024;
@@ -55,7 +55,7 @@ TEST(BinaryFuseFilter, SerializeAndDeserializeFilter)
 
 // Tests that the bits-per-entry is less than the theoretical maximum. The theoretical maximum is log2(plaintext_modulo) + 2.
 // This test is inspired by https://github.com/claucece/chalamet/blob/515ff1479940a2917ad247acb6ab9e6d27e139a1/bff-modp/src/bfusep32.rs#L158-L173.
-TEST(BinaryFuseFilter, CheckBitsPerEntry)
+TEST(BinaryFuseFilterForKVMap, CheckBitsPerEntry)
 {
   constexpr size_t size = 100'000;
   constexpr uint64_t plaintext_modulo = 1024;
