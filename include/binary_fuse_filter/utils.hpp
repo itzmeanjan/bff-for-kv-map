@@ -9,6 +9,7 @@
 
 namespace bff_kv_map_utils {
 
+// Represents a key in the Binary Fuse Filter for key-value map. It's composed of four 64-bit words.
 struct bff_key_t
 {
 public:
@@ -21,6 +22,7 @@ public:
   }
 };
 
+// Checks if all keys in the given span are distinct. Returns true if all keys are unique, false otherwise.
 static inline bool
 are_all_keys_distinct(std::span<const bff_key_t> keys)
 {
@@ -36,12 +38,14 @@ are_all_keys_distinct(std::span<const bff_key_t> keys)
   return true;
 }
 
+// Computes a 32-bit fingerprint from a 64-bit hash value.
 static constexpr uint32_t
 fingerprint(const uint64_t hash)
 {
   return static_cast<uint32_t>(hash ^ (hash >> 32U));
 }
 
+// Calculates the segment length based on arity and size parameter of Binary Fuse Filter for KV Map.
 static constexpr uint32_t
 calculate_segment_length(const uint32_t arity, const uint32_t size)
 {
@@ -57,6 +61,7 @@ calculate_segment_length(const uint32_t arity, const uint32_t size)
   return 65536;
 }
 
+// Calculates the size factor based on arity and size parameter of Binary Fuse Filter for KV Map.
 static constexpr double
 calculate_size_factor(const uint32_t arity, const uint32_t size)
 {
@@ -77,6 +82,8 @@ mod3(const uint8_t x)
   return (x > 2) ? (x - 3) : x;
 }
 
+// Computes a 64-bit MurmurHash3-like hash from a 64-bit input.
+// See https://github.com/aappleby/smhasher/blob/0ff96f7835817a27d0487325b6c16033e2992eb5/src/MurmurHash3.cpp#L81-L90.
 static constexpr uint64_t
 murmur64(uint64_t h)
 {
@@ -89,12 +96,14 @@ murmur64(uint64_t h)
   return h;
 }
 
+// Mixes two 64-bit values using MurmurHash3-like function.
 static constexpr uint64_t
 mix(const uint64_t key, const uint64_t seed)
 {
   return murmur64(key + seed);
 }
 
+// Mixes four 64-bit values with a 32-byte seed using MurmurHash3-like function.
 static inline uint64_t
 mix256(std::span<const uint64_t, 4> key, std::span<const uint8_t, 32> seed)
 {
@@ -115,6 +124,7 @@ mix256(std::span<const uint64_t, 4> key, std::span<const uint8_t, 32> seed)
   return mixed_outer;
 }
 
+// Computes the high 64 bits of the 128-bit product of two 64-bit integers.  This is used for 64-bit multiplication without overflow.
 static constexpr uint64_t
 mulhi(const uint64_t a, const uint64_t b)
 {

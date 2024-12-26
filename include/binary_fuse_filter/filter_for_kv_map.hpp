@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <span>
+#include <stdexcept>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -16,6 +17,8 @@ namespace bff_kv_map {
 
 constexpr size_t BFF_FOR_KV_MAP_MAX_CREATE_ATTEMPT_COUNT = 100;
 
+// Binary Fuse Filter for Key Value Maps with ability to reconstruct values when queried with keys.
+// Collects inspiration from @ https://github.com/claucece/chalamet/tree/515ff1479940a2917ad247acb6ab9e6d27e139a1/bff-modp.
 struct bff_for_kv_map_t
 {
 private:
@@ -33,19 +36,41 @@ private:
   std::vector<uint32_t> fingerprints;
 
 public:
-  bff_for_kv_map_t(const uint32_t num_keys)
+  /**
+   * @brief Construct a Binary Fuse Filter for Key-Value Map.
+   *
+   * @param keys The keys of the Key-Value Map.
+   * @param values The values of the Key-Value Map s.t. value ∈ [0,plaintext_modulo)
+   * @param plaintext_modulo The plaintext modulo to use.
+   * @param label The label to use.
+   */
+  explicit bff_for_kv_map_t(std::span<const bff_kv_map_utils::bff_key_t> keys,
+                            std::span<const uint32_t> values,
+                            const uint64_t plaintext_modulo,
+                            const uint64_t label)
   {
+    if (keys.size() != values.size()) [[unlikely]] {
+      throw std::runtime_error("Number of keys and values must be equal.");
+    }
+    if (!bff_kv_map_utils::are_all_keys_distinct(keys)) [[unlikely]] {
+      throw std::runtime_error("All keys must be unique.");
+    }
+    if (plaintext_modulo < 256) [[unlikely]] {
+      throw std::runtime_error("Plaintext modulo must be >= 256.");
+    }
+
+    num_keys_in_kv_map = keys.size();
+
     constexpr uint32_t arity = 3;
-    segment_length = num_keys == 0 ? 4 : bff_kv_map_utils::calculate_segment_length(arity, num_keys);
+    segment_length = num_keys_in_kv_map == 0 ? 4 : bff_kv_map_utils::calculate_segment_length(arity, num_keys_in_kv_map);
     if (segment_length > 262144) {
       segment_length = 262144;
     }
 
-    this->num_keys_in_kv_map = num_keys;
     segment_length_mask = segment_length - 1;
 
-    const double sizeFactor = num_keys <= 1 ? 0 : bff_kv_map_utils::calculate_size_factor(arity, num_keys);
-    const uint32_t capacity = num_keys <= 1 ? 0 : static_cast<uint32_t>(round(static_cast<double>(num_keys) * sizeFactor));
+    const double sizeFactor = num_keys_in_kv_map <= 1 ? 0 : bff_kv_map_utils::calculate_size_factor(arity, num_keys_in_kv_map);
+    const uint32_t capacity = num_keys_in_kv_map <= 1 ? 0 : static_cast<uint32_t>(round(static_cast<double>(num_keys_in_kv_map) * sizeFactor));
     const uint32_t initSegmentCount = (capacity + segment_length - 1) / segment_length - (arity - 1);
 
     array_length = (initSegmentCount + arity - 1) * segment_length;
@@ -61,130 +86,15 @@ public:
     segment_count_length = segment_count * segment_length;
 
     fingerprints = std::vector<uint32_t>(array_length, 0);
-  }
-
-  bff_for_kv_map_t(std::span<const uint8_t> bytes)
-  {
-    size_t buffer_offset = 0;
-
-    std::copy_n(bytes.subspan(buffer_offset).begin(), seed.size(), seed.begin());
-    buffer_offset += seed.size();
-
-    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(num_keys_in_kv_map), reinterpret_cast<uint8_t*>(&num_keys_in_kv_map));
-    buffer_offset += sizeof(num_keys_in_kv_map);
-
-    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(plaintext_modulo), reinterpret_cast<uint8_t*>(&plaintext_modulo));
-    buffer_offset += sizeof(plaintext_modulo);
-
-    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(label), reinterpret_cast<uint8_t*>(&label));
-    buffer_offset += sizeof(label);
-
-    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_length), reinterpret_cast<uint8_t*>(&segment_length));
-    buffer_offset += sizeof(segment_length);
-
-    segment_length_mask = segment_length - 1;
-
-    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_count), reinterpret_cast<uint8_t*>(&segment_count));
-    buffer_offset += sizeof(segment_count);
-
-    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_count_length), reinterpret_cast<uint8_t*>(&segment_count_length));
-    buffer_offset += sizeof(segment_count_length);
-
-    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(array_length), reinterpret_cast<uint8_t*>(&array_length));
-    buffer_offset += sizeof(array_length);
-
-    fingerprints = std::vector<uint32_t>(array_length, 0);
-    std::copy_n(bytes.subspan(buffer_offset).begin(), array_length * sizeof(uint32_t), reinterpret_cast<uint8_t*>(fingerprints.data()));
-  }
-
-  ~bff_for_kv_map_t()
-  {
-    seed.fill(0);
-
-    num_keys_in_kv_map = 0;
-    plaintext_modulo = 0;
-    label = 0;
-
-    segment_length = 0;
-    segment_length_mask = 0;
-    segment_count = 0;
-    segment_count_length = 0;
-    array_length = 0;
-    fingerprints.clear();
-  }
-
-  size_t bits_per_entry() const { return (fingerprints.size() * static_cast<size_t>(std::log2(plaintext_modulo))) / static_cast<size_t>(num_keys_in_kv_map); }
-
-  size_t serialized_num_bytes()
-  {
-    return sizeof(seed) + sizeof(num_keys_in_kv_map) + sizeof(plaintext_modulo) + sizeof(label) + sizeof(segment_length) + sizeof(segment_count) +
-           sizeof(segment_count_length) + sizeof(array_length) + (fingerprints.size() * sizeof(uint32_t));
-  }
-
-  bool serialize(std::span<uint8_t> bytes)
-  {
-    if (bytes.size() != serialized_num_bytes()) [[unlikely]] {
-      return false;
-    }
-
-    size_t buffer_offset = 0;
-    std::copy_n(seed.begin(), seed.size(), bytes.begin());
-
-    buffer_offset += seed.size();
-    std::copy_n(reinterpret_cast<const uint8_t*>(&num_keys_in_kv_map), sizeof(num_keys_in_kv_map), bytes.subspan(buffer_offset).begin());
-
-    buffer_offset += sizeof(num_keys_in_kv_map);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&plaintext_modulo), sizeof(plaintext_modulo), bytes.subspan(buffer_offset).begin());
-
-    buffer_offset += sizeof(plaintext_modulo);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&label), sizeof(label), bytes.subspan(buffer_offset).begin());
-
-    buffer_offset += sizeof(label);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_length), sizeof(segment_length), bytes.subspan(buffer_offset).begin());
-
-    buffer_offset += sizeof(segment_length);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count), sizeof(segment_count), bytes.subspan(buffer_offset).begin());
-
-    buffer_offset += sizeof(segment_count);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count_length), sizeof(segment_count_length), bytes.subspan(buffer_offset).begin());
-
-    buffer_offset += sizeof(segment_count_length);
-    std::copy_n(reinterpret_cast<const uint8_t*>(&array_length), sizeof(array_length), bytes.subspan(buffer_offset).begin());
-
-    buffer_offset += sizeof(array_length);
-    std::copy_n(reinterpret_cast<const uint8_t*>(fingerprints.data()), array_length * sizeof(uint32_t), bytes.subspan(buffer_offset).begin());
-
-    return true;
-  }
-
-  bool construct(std::span<const bff_kv_map_utils::bff_key_t> keys, // 256 -bit keys
-                 std::span<const uint32_t> values,                  // Corresponding values s.t. ∈ [0,plaintext_modulo)
-                 const uint64_t plaintext_modulo,
-                 const uint64_t label)
-  {
-    if (num_keys_in_kv_map != keys.size()) [[unlikely]] {
-      return false;
-    }
-    if (keys.size() != values.size()) [[unlikely]] {
-      return false;
-    }
-    if (!bff_kv_map_utils::are_all_keys_distinct(keys)) [[unlikely]] {
-      return false;
-    }
-    if (plaintext_modulo < 256) [[unlikely]] {
-      return false;
-    }
 
     this->plaintext_modulo = plaintext_modulo;
     this->label = label;
 
-    const uint32_t capacity = array_length;
-
     std::vector<uint64_t> reverseOrder(num_keys_in_kv_map + 1, 0);
-    std::vector<uint32_t> alone(capacity, 0);
-    std::vector<uint8_t> t2count(capacity, 0);
+    std::vector<uint32_t> alone(array_length, 0);
+    std::vector<uint8_t> t2count(array_length, 0);
     std::vector<uint8_t> reverseH(num_keys_in_kv_map, 0);
-    std::vector<uint64_t> t2hash(capacity, 0);
+    std::vector<uint64_t> t2hash(array_length, 0);
 
     uint32_t block_bits = 1;
     while ((1U << block_bits) < segment_count) {
@@ -201,7 +111,7 @@ public:
 
     for (size_t loop = 0; true; loop++) {
       if ((loop + 1) > BFF_FOR_KV_MAP_MAX_CREATE_ATTEMPT_COUNT) [[unlikely]] {
-        return false;
+        throw std::runtime_error("Failed to construct Binary Fuse Filter for input Key-Value Map.");
       }
 
       for (uint32_t i = 0; i < block_size; i++) {
@@ -322,10 +232,132 @@ public:
 
       fingerprints[h012[found]] = (entry - mask) % plaintext_modulo;
     }
+  }
+
+  /**
+   * @brief Construct a Binary Fuse Filter for Key-Value Map from serialized bytes.
+   *
+   * @param bytes The serialized bytes representation of a Binary Fuse Filter.
+   */
+  explicit bff_for_kv_map_t(std::span<const uint8_t> bytes)
+  {
+    size_t buffer_offset = 0;
+
+    std::copy_n(bytes.subspan(buffer_offset).begin(), seed.size(), seed.begin());
+    buffer_offset += seed.size();
+
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(num_keys_in_kv_map), reinterpret_cast<uint8_t*>(&num_keys_in_kv_map));
+    buffer_offset += sizeof(num_keys_in_kv_map);
+
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(plaintext_modulo), reinterpret_cast<uint8_t*>(&plaintext_modulo));
+    buffer_offset += sizeof(plaintext_modulo);
+
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(label), reinterpret_cast<uint8_t*>(&label));
+    buffer_offset += sizeof(label);
+
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_length), reinterpret_cast<uint8_t*>(&segment_length));
+    buffer_offset += sizeof(segment_length);
+
+    segment_length_mask = segment_length - 1;
+
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_count), reinterpret_cast<uint8_t*>(&segment_count));
+    buffer_offset += sizeof(segment_count);
+
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(segment_count_length), reinterpret_cast<uint8_t*>(&segment_count_length));
+    buffer_offset += sizeof(segment_count_length);
+
+    std::copy_n(bytes.subspan(buffer_offset).begin(), sizeof(array_length), reinterpret_cast<uint8_t*>(&array_length));
+    buffer_offset += sizeof(array_length);
+
+    fingerprints = std::vector<uint32_t>(array_length, 0);
+    std::copy_n(bytes.subspan(buffer_offset).begin(), array_length * sizeof(uint32_t), reinterpret_cast<uint8_t*>(fingerprints.data()));
+  }
+
+  /**
+   * @brief Destroy the Binary Fuse Filter for Key-Value Map, while zeroing out data members.
+   */
+  ~bff_for_kv_map_t()
+  {
+    seed.fill(0);
+
+    num_keys_in_kv_map = 0;
+    plaintext_modulo = 0;
+    label = 0;
+
+    segment_length = 0;
+    segment_length_mask = 0;
+    segment_count = 0;
+    segment_count_length = 0;
+    array_length = 0;
+    fingerprints.clear();
+  }
+
+  /**
+   * @brief Get the number of bits per entry in the Binary Fuse Filter.
+   *
+   * @return The number of bits per entry.
+   */
+  size_t bits_per_entry() const { return (fingerprints.size() * static_cast<size_t>(std::log2(plaintext_modulo))) / static_cast<size_t>(num_keys_in_kv_map); }
+
+  /**
+   * @brief Get the size of the serialized representation of the Binary Fuse Filter in bytes.
+   *
+   * @return The size in bytes.
+   */
+  size_t serialized_num_bytes()
+  {
+    return sizeof(seed) + sizeof(num_keys_in_kv_map) + sizeof(plaintext_modulo) + sizeof(label) + sizeof(segment_length) + sizeof(segment_count) +
+           sizeof(segment_count_length) + sizeof(array_length) + (fingerprints.size() * sizeof(uint32_t));
+  }
+
+  /**
+   * @brief Serialize the Binary Fuse Filter to a byte array.
+   *
+   * @param bytes The byte array to serialize to.
+   * @return True if serialization was successful, false otherwise.
+   */
+  bool serialize(std::span<uint8_t> bytes)
+  {
+    if (bytes.size() != serialized_num_bytes()) [[unlikely]] {
+      return false;
+    }
+
+    size_t buffer_offset = 0;
+    std::copy_n(seed.begin(), seed.size(), bytes.begin());
+
+    buffer_offset += seed.size();
+    std::copy_n(reinterpret_cast<const uint8_t*>(&num_keys_in_kv_map), sizeof(num_keys_in_kv_map), bytes.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(num_keys_in_kv_map);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&plaintext_modulo), sizeof(plaintext_modulo), bytes.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(plaintext_modulo);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&label), sizeof(label), bytes.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(label);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_length), sizeof(segment_length), bytes.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(segment_length);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count), sizeof(segment_count), bytes.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(segment_count);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&segment_count_length), sizeof(segment_count_length), bytes.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(segment_count_length);
+    std::copy_n(reinterpret_cast<const uint8_t*>(&array_length), sizeof(array_length), bytes.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(array_length);
+    std::copy_n(reinterpret_cast<const uint8_t*>(fingerprints.data()), array_length * sizeof(uint32_t), bytes.subspan(buffer_offset).begin());
 
     return true;
   }
 
+  /**
+   * @brief Recover the value associated with a given key.
+   *
+   * @param key The key to query.
+   * @return The value associated with the key.
+   */
   uint32_t recover(const bff_kv_map_utils::bff_key_t key)
   {
     const uint64_t hash = bff_kv_map_utils::mix256(key.words, seed);
@@ -337,6 +369,11 @@ public:
     return (data + mask) % plaintext_modulo;
   }
 
+  /**
+   * @brief Get the fingerprints of the Binary Fuse Filter modulo p.
+   *
+   * @return A vector of fingerprints modulo p.
+   */
   std::vector<uint32_t> get_fingerprints_mod_p() const
   {
     std::vector<uint32_t> result;
@@ -349,6 +386,12 @@ public:
     return result;
   }
 
+  /**
+   * @brief Get the hash evaluations for a given key.
+   *
+   * @param key The key to evaluate.
+   * @return An array of three hash evaluations.
+   */
   std::array<uint32_t, 3> get_hash_evals(const bff_kv_map_utils::bff_key_t key) const
   {
     const auto hash = bff_kv_map_utils::mix256(key.words, seed);
@@ -357,6 +400,12 @@ public:
     return { h0, h1, h2 };
   }
 
+  /**
+   * @brief Get the key fingerprint for a given key.
+   *
+   * @param key The key to fingerprint.
+   * @return The key fingerprint.
+   */
   uint64_t get_key_fingerprint(const bff_kv_map_utils::bff_key_t key) const
   {
     const auto hash = bff_kv_map_utils::mix256(key.words, seed);
@@ -364,20 +413,6 @@ public:
   }
 
 private:
-  constexpr uint32_t hash(uint64_t index, uint64_t hash) const
-  {
-    uint64_t h = bff_kv_map_utils::mulhi(hash, this->segment_count_length);
-    h += index * this->segment_length;
-
-    // keep the lower 36 bits
-    const uint64_t hh = hash & ((1ULL << 36U) - 1);
-
-    // index 0: right shift by 36; index 1: right shift by 18; index 2: no shift
-    h ^= (size_t)((hh >> (36 - 18 * index)) & this->segment_length_mask);
-
-    return (uint32_t)h;
-  }
-
   constexpr std::tuple<uint32_t, uint32_t, uint32_t> hash_batch(const uint64_t hash) const
   {
     const uint64_t hi = bff_kv_map_utils::mulhi(hash, this->segment_count_length);
