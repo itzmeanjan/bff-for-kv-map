@@ -70,3 +70,21 @@ TEST(BinaryFuseFilter, SerializeAndDeserializeFilter)
     EXPECT_EQ(values[i], recovered_filter1);
   }
 }
+
+TEST(BinaryFuseFilter, CheckBitsPerEntry)
+{
+  constexpr size_t size = 100'000;
+  constexpr uint64_t plaintext_modulo = 1024;
+  constexpr uint64_t label = 1;
+
+  std::vector<bff_utils::bff_key_t> keys(size);
+  std::vector<uint32_t> values(size, 0);
+
+  generate_random_keys_and_values(keys, values, plaintext_modulo);
+
+  binary_fuse_filter_Zp32_t filter(size);
+  EXPECT_TRUE(filter.construct(keys, values, plaintext_modulo, label));
+
+  const size_t bpe = filter.bits_per_entry();
+  EXPECT_LT(bpe, std::log2(plaintext_modulo) + 2);
+}
