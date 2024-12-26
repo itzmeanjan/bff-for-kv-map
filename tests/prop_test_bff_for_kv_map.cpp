@@ -10,11 +10,12 @@ TEST(BinaryFuseFilterForKVMap, CreateFilterAndRecoverValuesWhenQueriedUsingKeys)
   constexpr uint64_t plaintext_modulo = 1024;
   constexpr uint64_t label = 1;
 
+  auto seed = generate_random_seed();
   std::vector<bff_kv_map_utils::bff_key_t> keys(size);
   std::vector<uint32_t> values(size, 0);
   generate_random_keys_and_values(keys, values, plaintext_modulo);
 
-  bff_kv_map::bff_for_kv_map_t filter(keys, values, plaintext_modulo, label);
+  bff_kv_map::bff_for_kv_map_t filter(seed, keys, values, plaintext_modulo, label);
 
   for (size_t i = 0; i < size; i++) {
     const uint32_t recovered = filter.recover(keys[i]);
@@ -29,11 +30,12 @@ TEST(BinaryFuseFilterForKVMap, SerializeAndDeserializeFilter)
   constexpr uint64_t plaintext_modulo = 1024;
   constexpr uint64_t label = 1;
 
+  auto seed = generate_random_seed();
   std::vector<bff_kv_map_utils::bff_key_t> keys(size);
   std::vector<uint32_t> values(size, 0);
   generate_random_keys_and_values(keys, values, plaintext_modulo);
 
-  bff_kv_map::bff_for_kv_map_t filter(keys, values, plaintext_modulo, label);
+  bff_kv_map::bff_for_kv_map_t filter(seed, keys, values, plaintext_modulo, label);
 
   std::vector<uint8_t> filter_as_bytes(filter.serialized_num_bytes());
   EXPECT_TRUE(filter.serialize(filter_as_bytes));
@@ -57,11 +59,12 @@ TEST(BinaryFuseFilterForKVMap, CheckBitsPerEntry)
   constexpr uint64_t plaintext_modulo = 1024;
   constexpr uint64_t label = 1;
 
+  auto seed = generate_random_seed();
   std::vector<bff_kv_map_utils::bff_key_t> keys(size);
   std::vector<uint32_t> values(size, 0);
   generate_random_keys_and_values(keys, values, plaintext_modulo);
 
-  bff_kv_map::bff_for_kv_map_t filter(keys, values, plaintext_modulo, label);
+  bff_kv_map::bff_for_kv_map_t filter(seed, keys, values, plaintext_modulo, label);
 
   const size_t bpe = filter.bits_per_entry();
   EXPECT_LT(bpe, std::log2(plaintext_modulo) + 2);
