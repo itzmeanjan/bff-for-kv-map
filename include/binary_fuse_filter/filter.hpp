@@ -18,6 +18,8 @@ struct binary_fuse_filter_Zp32_t
 {
 private:
   std::array<uint8_t, 32> seed{};
+
+  uint32_t total_num_keys;
   uint64_t plaintext_modulo;
   uint64_t label;
 
@@ -31,6 +33,8 @@ private:
 public:
   binary_fuse_filter_Zp32_t(const uint32_t size)
   {
+    total_num_keys = size;
+
     constexpr uint32_t arity = 3;
     segment_length = size == 0 ? 4 : bff_utils::calculate_segment_length(arity, size);
     if (segment_length > 262144) {
@@ -64,6 +68,9 @@ public:
 
     std::copy_n(buffer.subspan(buffer_offset).begin(), seed.size(), seed.begin());
     buffer_offset += seed.size();
+
+    std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(total_num_keys), reinterpret_cast<uint8_t*>(&total_num_keys));
+    buffer_offset += sizeof(total_num_keys);
 
     std::copy_n(buffer.subspan(buffer_offset).begin(), sizeof(plaintext_modulo), reinterpret_cast<uint8_t*>(&plaintext_modulo));
     buffer_offset += sizeof(plaintext_modulo);
@@ -100,6 +107,8 @@ public:
     fingerprints.clear();
   }
 
+  size_t bits_per_entry() const { return (fingerprints.size() * static_cast<size_t>(std::log2(plaintext_modulo))) / static_cast<size_t>(total_num_keys); }
+
   size_t serialized_num_bytes()
   {
     return sizeof(seed) + sizeof(plaintext_modulo) + sizeof(label) + sizeof(segment_length) + sizeof(segment_length_mask) + sizeof(segment_count) +
@@ -116,6 +125,9 @@ public:
     std::copy_n(seed.begin(), seed.size(), buffer.begin());
 
     buffer_offset += seed.size();
+    std::copy_n(reinterpret_cast<const uint8_t*>(&total_num_keys), sizeof(total_num_keys), buffer.subspan(buffer_offset).begin());
+
+    buffer_offset += sizeof(total_num_keys);
     std::copy_n(reinterpret_cast<const uint8_t*>(&plaintext_modulo), sizeof(plaintext_modulo), buffer.subspan(buffer_offset).begin());
 
     buffer_offset += sizeof(plaintext_modulo);
