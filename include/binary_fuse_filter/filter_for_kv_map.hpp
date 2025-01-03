@@ -157,7 +157,7 @@ public:
       }
 
       if (error) {
-        std::fill(reverseOrder.begin(), reverseOrder.end(), 0);
+        std::fill_n(reverseOrder.begin(), reverseOrder.size() - 1, 0);
         std::fill(t2count.begin(), t2count.end(), 0);
         std::fill(t2hash.begin(), t2hash.end(), 0);
 
@@ -212,7 +212,7 @@ public:
         break;
       }
 
-      std::fill(reverseOrder.begin(), reverseOrder.end(), 0);
+      std::fill_n(reverseOrder.begin(), reverseOrder.size() - 1, 0);
       std::fill(t2count.begin(), t2count.end(), 0);
       std::fill(t2hash.begin(), t2hash.end(), 0);
     }
