@@ -165,7 +165,7 @@ public:
       }
 
       uint32_t Qsize = 0;
-      for (uint32_t i = 0; i < capacity; i++) {
+      for (uint32_t i = 0; i < array_length; i++) {
         alone[Qsize] = i;
         Qsize += ((t2count[i] >> 2U) == 1) ? 1U : 0U;
       }
