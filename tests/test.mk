@@ -79,16 +79,16 @@ test: $(TEST_BINARY) ## Build and run all tests in RELEASE mode
 
 debug_asan_test: $(DEBUG_ASAN_TEST_BINARY) ## Build and run all tests in DEBUG mode, with Address Sanitizer
 	ASAN_OPTIONS='halt_on_error=1:abort_on_error=1:print_summary=1' \
-	./$<
+	./$< --gtest_repeat=100 --gtest_shuffle --gtest_recreate_environments_when_repeating
 
 release_asan_test: $(RELEASE_ASAN_TEST_BINARY) ## Build and run all tests in RELEASE mode, with Address Sanitizer
 	ASAN_OPTIONS='halt_on_error=1:abort_on_error=1:print_summary=1' \
-	./$<
+	./$< --gtest_repeat=100 --gtest_shuffle --gtest_recreate_environments_when_repeating
 
 debug_ubsan_test: $(DEBUG_UBSAN_TEST_BINARY) ## Build and run all tests in DEBUG mode, with Undefined Behavior Sanitizer
 	UBSAN_OPTIONS='halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1' \
-	./$<
+	./$< --gtest_repeat=100 --gtest_shuffle --gtest_recreate_environments_when_repeating
 
 release_ubsan_test: $(RELEASE_UBSAN_TEST_BINARY) ## Build and run all tests in RELEASE mode, with Undefined Behavior Sanitizer
 	UBSAN_OPTIONS='halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1' \
-	./$<
+	./$< --gtest_repeat=100 --gtest_shuffle --gtest_recreate_environments_when_repeating
