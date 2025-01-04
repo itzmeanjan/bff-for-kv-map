@@ -1,176 +1,141 @@
-## Header-only Xor and Binary Fuse Filter library
-[![Ubuntu 22.04 CI (GCC 11)](https://github.com/FastFilter/xor_singleheader/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/FastFilter/xor_singleheader/actions/workflows/ubuntu.yml)
-[![MSYS2-CI](https://github.com/FastFilter/xor_singleheader/actions/workflows/msys2.yml/badge.svg)](https://github.com/FastFilter/xor_singleheader/actions/workflows/msys2.yml)
+# Binary Fuse Filter for Key-Value Maps
+This project provides a C++ implementation of a Binary Fuse Filter (BFF) for key-value maps. This data structure allows for efficient storage and retrieval of values associated with keys, offering a balance between space efficiency and query speed. Unlike traditional hash tables, it enables value reconstruction during queries, eliminating the need to store values explicitly.
 
-Bloom filters are used to quickly check whether an element is part of a set.
-Xor filters and binary fuse filters are faster and more concise alternative to Bloom filters.
-Furthermore, unlike Bloom filters, xor and binary fuse filters are naturally compressible using standard techniques (gzip, zstd, etc.).
-They are also smaller than cuckoo filters. They are used in [production systems](https://github.com/datafuselabs/databend).
+## Functionality
+The BFF-for-KV-Map library offers:
 
-* Thomas Mueller Graf, Daniel Lemire, [Binary Fuse Filters: Fast and Smaller Than Xor Filters](http://arxiv.org/abs/2201.01174), Journal of Experimental Algorithmics (to appear). DOI: 10.1145/3510449
-* Thomas Mueller Graf,  Daniel Lemire, [Xor Filters: Faster and Smaller Than Bloom and Cuckoo Filters](https://arxiv.org/abs/1912.08258), Journal of Experimental Algorithmics 25 (1), 2020. DOI: 10.1145/3376122
+* **Creation:** Constructs a BFF from a set of keys and their corresponding values. It employs a randomized construction algorithm to ensure a high probability of successful filter creation.
+* **Serialization:** Serializes the filter into a byte array for storage or transmission.
+* **Deserialization:** Reconstructs a BFF from its serialized byte representation.
+* **Recovery:** Retrieves the value associated with a given key. The value is reconstructed from the filter's internal state, not directly retrieved from storage.
+* **Metrics:** Provides methods to obtain the bits-per-entry and serialized size of the filter.
 
+Using this implementation of Binary Fuse Filter for KV Maps, on AWS EC2 instance `m8g.large`, it takes
 
-<img src="figures/comparison.png" width="50%"/>
+Operation | Time Taken
+--- | --:
+Construct Filter over KV Map with 1M keys | 1.44s
+Recover value from this filter, corresponding to a queried key | 43.3ns
+___ | ___
+Construct Filter over KV Map with 10M keys | 23.6s
+Recover value from this filter, corresponding to a queried key | 150ns
 
-This is a simple C header-only library. It implements both binary fuse and xor filters.
+See detailed benchmark results in [bench_result_on_Linux_6.8.0-1018-aws_aarch64_with_g++_13.json](./bench_result_on_Linux_6.8.0-1018-aws_aarch64_with_g++_13.json).
 
+## Usage
+### 1. Include Headers
+Include the necessary header files in your C++ code:
 
-To use the state-of-the-art binary fuse filters, simply add (for example) the `binaryfusefilter.h` file to your project.  It is made available under the business-friendly Apache license.
-
-
-For a simple application built on this library, see
-https://github.com/FastFilter/FilterPassword
-
-We are assuming that your set is made of 64-bit integers. If you have a set of strings
-or other data structures, you need to hash them first to a 64-bit integer. It
-is not important to have a good hash function, but collisions should be unlikely
-(~1/2^64). A few collisions are acceptable, but we expect that your initial set
-should have no duplicated entry.
-
-The basic version works with 8-bit word and has a false-positive probability of
-1/256 (or 0.4%).
-
-```C
-uint64_t *big_set = ...
-binary_fuse8_t filter;
-bool is_ok = binary_fuse8_allocate(size, &filter);
-if(! is_ok ) {
-    // do something (you have run out of memory)
-}
-is_ok = binary_fuse8_populate(big_set, size, &filter);
-if(! is_ok ) {
-    // do something (you have run out of memory)
-}
-binary_fuse8_contain(big_set[0], &filter); // will be true
-binary_fuse8_contain(somerandomvalue, &filter); // will be false with high probability
-
-binary_fuse8_free(&filter);
+```c++
+#include "binary_fuse_filter/filter_for_kv_map.hpp"
+#include "binary_fuse_filter/utils.hpp"
 ```
 
-We also have a 16-bit version which uses about twice the memory,
-but has a far lower false-positive probability (256 times smaller):
-about 0.0015%. The type is `binary_fuse16_t` and you may use it with
-functions such as `binary_fuse16_allocate`, `binary_fuse16_populate`,
-`binary_fuse8_contain` and `binary_fuse8_free`.
+### 2. Data Structures
+The library uses the following key structure:
 
-You may serialize the data as follows:
-
-```C
-  size_t buffer_size = binary_fuse16_serialization_bytes(&filter);
-  char *buffer = (char*)malloc(buffer_size);
-  binary_fuse16_serialize(&filter, buffer);
-  binary_fuse16_free(&filter);
-  binary_fuse16_deserialize(&filter, buffer);
-  free(buffer);
-```
-
-The serialization does not handle endianess: it is expected that you will serialize
-and deserialize on the little endian systems. (Big endian systems are vanishingly rare.)
-
-
-## C++ wrapper
-
-If you want a C++ version, we recommend [binfuse](https://github.com/oschonrock/binfuse) by Oliver Schönrock.
-
-
-You can also roll your own:
-
-```C++
-#include "binaryfusefilter.h"
-
-class BinaryFuse {
-public:
-    explicit BinaryFuse(const size_t size) {
-        if (!binary_fuse8_allocate(size, &filter)) {
-            throw ::std::runtime_error("Allocation failed.");
-        }
-    }
-    ~BinaryFuse() {
-        binary_fuse8_free(&filter);
-    }
-
-    bool AddAll(uint64_t* data, const size_t start, const size_t end) {
-        return binary_fuse8_populate(data + start, end - start, &filter);
-    }
-    inline bool Contain(uint64_t &item) const {
-        return binary_fuse8_contain(item, &filter);
-    }
-    inline size_t SizeInBytes() const {
-        return binary_fuse8_size_in_bytes(&filter);
-    }
-    BinaryFuse(BinaryFuse && o) : filter(o.filter)  {
-        o.filter.Fingerprints = nullptr; // we take ownership for the data
-    }
-    binary_fuse8_t filter;
-
-private:
-    BinaryFuse(const BinaryFuse & o) = delete;
+```c++
+struct bff_kv_map_utils::bff_key_t {
+  std::array<uint64_t, 4> words{};
 };
 ```
 
+You need to represent your keys using this structure.
 
-## Memory requirement
+### 3. Construction
+Construct a BFF from your key-value pairs:
 
-The construction of a binary fuse filter is fast but it needs a fair amount of temporary memory: plan for about 24 bytes of memory per set entry. It is possible to construct a binary fuse filter with almost no temporary memory, but the construction is then somewhat slower.
+```c++
+#include <random>
+#include <array>
 
-## Persistent usage
+// ... (Your key-value data) ...
 
-The data structure of a `binary_fuse8_t` instance quite simple. Thus you can easily save it to disk or memory-map it. E.g., we have
+std::array<uint8_t, 32> seed{};
+std::random_device rd;
+std::mt19937 gen(rd());
+std::uniform_int_distribution<> distrib(0, 255);
+for (int n = 0; n < 32; ++n) {
+  seed[n] = distrib(gen);
+}
 
-```C
-typedef struct binary_fuse8_s {
-  uint64_t Seed;
-  uint32_t SegmentLength;
-  uint32_t SegmentLengthMask;
-  uint32_t SegmentCount;
-  uint32_t SegmentCountLength;
-  uint32_t ArrayLength;
-  uint8_t *Fingerprints; // points to ArrayLength bytes
-} binary_fuse8_t;
+std::vector<bff_kv_map_utils::bff_key_t> keys = { /* ... your keys ... */ };
+std::vector<uint32_t> values = { /* ... your values ... */ };
+uint64_t plaintext_modulo = 1024; // Choose an appropriate value. Must be >= 256.
+uint64_t label = 12345; // Choose an arbitrary label.
+
+bff_kv_map::bff_for_kv_map_t bff(seed, keys, values, plaintext_modulo, label);
 ```
 
-## Running tests and benchmarks
+### 4. Recovery
+Retrieve a value using its key:
 
-To run tests: `make test`.
-
-
-```
-$ make test
-$ ./unit
-./unit
-testing binary fuse8
- fpp 0.00392 (estimated)
- bits per entry 9.04
- bits per entry 7.99 (theoretical lower bound)
- efficiency ratio 1.131
-....
+```c++
+bff_kv_map_utils::bff_key_t query_key = { /* ... your query key ... */ };
+uint32_t recovered_value = bff.recover(query_key);
 ```
 
-To run construction benchmarks:
-```
-$ make bench
-$ ./bench
+### 5. Serialization and Deserialization
+Serialize the BFF to a byte array:
 
-❯ ./bench
-testing binary fuse8 size = 10000000
-It took 0.358196 seconds to build an index over 10000000 values.
-It took 0.355775 seconds to build an index over 10000000 values.
-It took 0.367437 seconds to build an index over 10000000 values.
-It took 0.358578 seconds to build an index over 10000000 values.
-It took 0.358220 seconds to build an index over 10000000 values.
-...
+```c++
+const size_t serialized_size = bff.serialized_num_bytes();
+std::vector<uint8_t> serialized_bff(serialized_size, 0);
+bff.serialize(serialized_bff);
 ```
 
-## Implementations of xor and binary fuse filters in other programmming languages
+Deserialize the BFF from the byte array:
 
-* [Go](https://github.com/FastFilter/xorfilter)
-* [Erlang](https://github.com/mpope9/exor_filter)
-* Rust: [1](https://github.com/bnclabs/xorfilter), [2](https://github.com/codri/xorfilter-rs), [3](https://github.com/Polochon-street/rustxorfilter)
-* [Zig](https://github.com/hexops/fastfilter)
-* [C++](https://github.com/FastFilter/fastfilter_cpp)
-* [Java](https://github.com/FastFilter/fastfilter_java)
-* [Python](https://github.com/GreyDireWolf/pyxorfilter)
-* [C99](https://github.com/skeeto/xf8)
-* [Julia](https://github.com/JokingHero/FastFilter.jl)
-* [C#](https://github.com/jonmat/FastIndex)
+```c++
+bff_kv_map::bff_for_kv_map_t deserialized_bff(serialized_bff);
+```
+
+**Note**
+
+I maintain an example program @ [bff_for_kv_map.cpp](./examples/bff_for_kv_map.cpp), demonstrating usage of the Binary Fuse Filter for Key-Value Maps.
+You can build and run that program by issuing
+
+```bash
+make example -j
+
+Number of keys: 100000
+Plaintext modulo: 1024
+Bits per entry: 11
+Serialized size: 475204 bytes
+All values recovered correctly !
+```
+
+## Build Instructions
+This project uses a Makefile for building.  Make sure you have a C++20 compiler (like g++ or clang++),  Google Benchmark, and Google Test installed.
+
+> ![NOTE]
+> You can run `$ make` to show a help output, covering all available Make commands.
+
+1. **Run Tests:** To run the tests, use the following commands:
+
+```bash
+make test -j                # Runs tests in release mode.
+make debug_asan_test -j     # Runs tests in debug mode with AddressSanitizer (detects memory errors).  Requires AddressSanitizer to be properly configured in your compiler.
+make release_asan_test -j   # Runs tests in release mode with AddressSanitizer.
+make debug_ubsan_test -j    # Runs tests in debug mode with UndefinedBehaviorSanitizer (detects undefined behavior). Requires UndefinedBehaviorSanitizer to be properly configured in your compiler.
+make release_ubsan_test -j  # Runs tests in release mode with UndefinedBehaviorSanitizer.
+```
+
+2. **Run Benchmarks:** To run the benchmarks, use these commands:
+
+```bash
+make benchmark  # Runs benchmarks without detailed CPU cycle counting.
+make perf       # Runs benchmarks with CPU cycle counting (requires `libpfm4` to be installed: `sudo apt-get install libpfm4`).
+```
+
+## Dependencies
+* C++20 compiler (g++, clang++)
+* Google Benchmark, see [this](https://github.com/google/benchmark#installation)
+* Google Test, see [this](https://github.com/google/googletest/tree/main/googletest#standalone-cmake-project)
+* (Optional for `make perf`) `libpfm4`
+
+## Notes
+* The random seed is crucial for filter construction. Using a cryptographically secure random number generator is recommended for production environments.
+* Error handling is included to catch issues like non-unique keys and invalid parameter values.
+
+This README provides a basic overview. Refer to the source code for detailed implementation specifics and advanced usage options.
