@@ -78,15 +78,26 @@ Deserialize the BFF from the byte array:
 bff_kv_map::bff_for_kv_map_t deserialized_bff(serialized_bff);
 ```
 
-## Build Instructions
-This project uses a Makefile for building.  Make sure you have a C++20 compiler (like g++ or clang++),  Google Benchmark, and Google Test installed. On Debian/Ubuntu systems:
+**Note**
+
+I maintain an example program @ [bff_for_kv_map.cpp](./examples/bff_for_kv_map.cpp), demonstrating usage of the Binary Fuse Filter for Key-Value Maps.
+You can build and run that program by issuing
 
 ```bash
-sudo apt-get install g++ libgoogle-benchmark-dev libgtest-dev
+make example -j
+
+Number of keys: 100000
+Plaintext modulo: 1024
+Bits per entry: 11
+Serialized size: 475204 bytes
+All values recovered correctly !
 ```
 
+## Build Instructions
+This project uses a Makefile for building.  Make sure you have a C++20 compiler (like g++ or clang++),  Google Benchmark, and Google Test installed.
+
 > ![NOTE]
-> You can run `make` to show a help output for all available Make commands.
+> You can run `$ make` to show a help output, covering all available Make commands.
 
 1. **Run Tests:** To run the tests, use the following commands:
 
