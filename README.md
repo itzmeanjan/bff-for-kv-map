@@ -10,6 +10,18 @@ The BFF-for-KV-Map library offers:
 * **Recovery:** Retrieves the value associated with a given key. The value is reconstructed from the filter's internal state, not directly retrieved from storage.
 * **Metrics:** Provides methods to obtain the bits-per-entry and serialized size of the filter.
 
+Using this implementation of Binary Fuse Filter for KV Maps, on AWS EC2 instance `m8g.large`, it takes
+
+Operation | Time Taken
+--- | --:
+Construct Filter over KV Map with 1M keys | 1.44s
+Recover value from this filter, corresponding to a queried key | 43.3ns
+___ | ___
+Construct Filter over KV Map with 10M keys | 23.6s
+Recover value from this filter, corresponding to a queried key | 150ns
+
+See detailed benchmark results in [bench_result_on_Linux_6.8.0-1018-aws_aarch64_with_g++_13.json](./bench_result_on_Linux_6.8.0-1018-aws_aarch64_with_g++_13.json).
+
 ## Usage
 ### 1. Include Headers
 Include the necessary header files in your C++ code:
