@@ -108,7 +108,7 @@ All values recovered correctly !
 ## Build Instructions
 This project uses a Makefile for building.  Make sure you have a C++20 compiler (like g++ or clang++),  Google Benchmark, and Google Test installed.
 
-> ![NOTE]
+> [!NOTE]
 > You can run `$ make` to show a help output, covering all available Make commands.
 
 1. **Run Tests:** To run the tests, use the following commands:
