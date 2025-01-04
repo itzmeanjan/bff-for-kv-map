@@ -24,11 +24,12 @@ BUILD_DIR := build
 
 include tests/test.mk
 include benches/bench.mk
+include examples/example.mk
 
 .PHONY: clean
 clean: ## Remove build directory
 	rm -rf $(BUILD_DIR)
 
 .PHONY: format
-format: $(BFF_FOR_KV_MAP_SOURCES) $(TEST_SOURCES) $(TEST_HEADERS) ## Format source code
+format: $(BFF_FOR_KV_MAP_SOURCES) $(TEST_SOURCES) $(TEST_HEADERS) $(BENCHMARK_SOURCES) $(BENCHMARK_HEADERS) $(EXAMPLE_SOURCES) $(EXAMPLE_HEADERS) ## Format source code
 	clang-format -i $^
