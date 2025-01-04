@@ -53,22 +53,30 @@ main()
   try {
     bff = bff_kv_map::bff_for_kv_map_t(seed, keys, values, plaintext_modulo, label);
 
-    std::cout << "Bits per entry: " << bff.bits_per_entry() << std::endl;
-    std::cout << "Serialized size: " << bff.serialized_num_bytes() << " bytes" << std::endl;
+    std::cout << "Number of keys: " << num_keys << "\n";
+    std::cout << "Plaintext modulo: " << plaintext_modulo << "\n";
+    std::cout << "Bits per entry: " << bff.bits_per_entry() << "\n";
+    std::cout << "Serialized size: " << bff.serialized_num_bytes() << " bytes" << "\n";
 
     std::vector<uint8_t> serialized_bff(bff.serialized_num_bytes());
     bff.serialize(serialized_bff);
 
     bff_kv_map::bff_for_kv_map_t deserialized_bff(serialized_bff);
 
+    bool failed_to_recover = false;
     for (size_t i = 0; i < num_keys; ++i) {
       const uint32_t recovered_value = deserialized_bff.recover(keys[i]);
       if (recovered_value != values[i]) {
-        std::cout << "Recovery failed for key " << i << ": (recovered value: " << recovered_value << ") (original: " << values[i] << ")" << std::endl;
+        std::cout << "Recovery failed for key " << i << ": (recovered value: " << recovered_value << ") (original: " << values[i] << ")" << "\n";
+        failed_to_recover = true;
       }
     }
+
+    if (!failed_to_recover) {
+      std::cout << "All values recovered correctly !\n";
+    }
   } catch (const std::exception& e) {
-    std::cerr << "Error during BFF construction: " << e.what() << std::endl;
+    std::cerr << "Error during BFF construction: " << e.what() << "\n";
     return 0; // Yes, we are suppressing the error.
   }
 
