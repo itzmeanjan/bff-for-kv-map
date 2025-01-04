@@ -34,28 +34,28 @@ bench_construction_of_bff_for_kv_map(benchmark::State& state)
 }
 
 BENCHMARK(bench_construction_of_bff_for_kv_map)
-  ->Name("bff_for_kv_map/construct/10K")
+  ->Name("bff_for_kv_map/construct/10K Keys")
   ->Arg(10'000)
   ->Unit(benchmark::TimeUnit::kMillisecond)
   ->ComputeStatistics("min", compute_min)
   ->ComputeStatistics("max", compute_max);
 
 BENCHMARK(bench_construction_of_bff_for_kv_map)
-  ->Name("bff_for_kv_map/construct/100K")
+  ->Name("bff_for_kv_map/construct/100K Keys")
   ->Arg(100'000)
   ->Unit(benchmark::TimeUnit::kMillisecond)
   ->ComputeStatistics("min", compute_min)
   ->ComputeStatistics("max", compute_max);
 
 BENCHMARK(bench_construction_of_bff_for_kv_map)
-  ->Name("bff_for_kv_map/construct/1M")
+  ->Name("bff_for_kv_map/construct/1M Keys")
   ->Arg(1'000'000)
   ->Unit(benchmark::TimeUnit::kSecond)
   ->ComputeStatistics("min", compute_min)
   ->ComputeStatistics("max", compute_max);
 
 BENCHMARK(bench_construction_of_bff_for_kv_map)
-  ->Name("bff_for_kv_map/construct/10M")
+  ->Name("bff_for_kv_map/construct/10M Keys")
   ->Arg(10'000'000)
   ->Unit(benchmark::TimeUnit::kSecond)
   ->ComputeStatistics("min", compute_min)
