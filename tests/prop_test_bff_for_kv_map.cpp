@@ -93,7 +93,7 @@ TEST(BinaryFuseFilterForKVMap, CheckBitsPerEntry)
   }
 }
 
-TEST(BinaryFuseFIlterForKVMap, AttemptConstructionWithInequalNumberOfKeysAndValues)
+TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithInequalNumberOfKeysAndValues)
 {
   constexpr size_t num_keys = 100'000;
   constexpr size_t num_values = num_keys - 1;
@@ -116,7 +116,7 @@ TEST(BinaryFuseFIlterForKVMap, AttemptConstructionWithInequalNumberOfKeysAndValu
   }
 }
 
-TEST(BinaryFuseFIlterForKVMap, AttemptConstructionWithRepeatingKeys)
+TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithRepeatingKeys)
 {
   constexpr size_t size = 100'000;
   constexpr uint64_t plaintext_modulo = 1024;
