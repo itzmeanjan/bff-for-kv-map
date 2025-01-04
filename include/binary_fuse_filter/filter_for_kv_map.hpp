@@ -24,18 +24,20 @@ struct bff_for_kv_map_t
 private:
   std::array<uint8_t, 32> seed{};
 
-  uint32_t num_keys_in_kv_map;
-  uint64_t plaintext_modulo;
-  uint64_t label;
+  uint32_t num_keys_in_kv_map = 0;
+  uint64_t plaintext_modulo = 0;
+  uint64_t label = 0;
 
-  uint32_t segment_length;
-  uint32_t segment_length_mask;
-  uint32_t segment_count;
-  uint32_t segment_count_length;
-  uint32_t array_length;
+  uint32_t segment_length = 0;
+  uint32_t segment_length_mask = 0;
+  uint32_t segment_count = 0;
+  uint32_t segment_count_length = 0;
+  uint32_t array_length = 0;
   std::vector<uint32_t> fingerprints;
 
 public:
+  bff_for_kv_map_t() = default;
+
   /**
    * @brief Construct a Binary Fuse Filter for Key-Value Map.
    *
