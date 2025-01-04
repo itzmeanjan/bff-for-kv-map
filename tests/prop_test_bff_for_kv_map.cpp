@@ -93,7 +93,8 @@ TEST(BinaryFuseFilterForKVMap, CheckBitsPerEntry)
   }
 }
 
-TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithInequalNumberOfKeysAndValues)
+// Tests that attempting to construct a filter with an unequal number of keys and values throws an exception.
+TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithUnequalNumberOfKeysAndValues)
 {
   constexpr size_t num_keys = 100'000;
   constexpr size_t num_values = num_keys - 1;
@@ -116,6 +117,7 @@ TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithInequalNumberOfKeysAndValu
   }
 }
 
+// Tests that attempting to construct a filter with repeating keys throws an exception.
 TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithRepeatingKeys)
 {
   constexpr size_t size = 100'000;
@@ -141,6 +143,7 @@ TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithRepeatingKeys)
   }
 }
 
+// Tests that attempting to construct a filter with plaintext modulo less than 256 throws an exception.
 TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithPlainTextModuloLesserThan256)
 {
   constexpr size_t size = 100'000;
