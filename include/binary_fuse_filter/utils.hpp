@@ -16,9 +16,26 @@ public:
   std::array<uint64_t, 4> words{};
 
   bff_key_t() = default;
+  explicit bff_key_t(std::span<const uint8_t, sizeof(words)> bytes)
+  {
+    words[0] = from_le_bytes(bytes.first<8>());
+    words[1] = from_le_bytes(bytes.subspan<8, 8>());
+    words[2] = from_le_bytes(bytes.subspan<16, 8>());
+    words[3] = from_le_bytes(bytes.last<8>());
+  }
+
   auto operator<=>(const auto& rhs) const
   {
     return std::lexicographical_compare_three_way(this->words.begin(), this->words.end(), rhs.words.begin(), rhs.words.end());
+  }
+
+private:
+  static inline uint64_t from_le_bytes(std::span<const uint8_t, 8> bytes)
+  {
+    uint64_t word = 0;
+    std::memcpy(reinterpret_cast<uint8_t*>(&word), bytes.data(), bytes.size());
+
+    return word;
   }
 };
 
