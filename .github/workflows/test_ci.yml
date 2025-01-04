@@ -35,3 +35,8 @@ jobs:
           else
             make ${{ matrix.build_type }}_${{ matrix.test_type }}_test -j
           fi
+
+      - name: Run Examples
+        if: ${{ matrix.test_type == 'standard' && matrix.build_type == 'release' }}
+        run: |
+            CXX=${{ matrix.compiler }} make example -j
