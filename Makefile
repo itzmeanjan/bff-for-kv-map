@@ -23,6 +23,7 @@ BFF_FOR_KV_MAP_SOURCES := $(shell find $(SRC_DIR) -name '*.hpp')
 BUILD_DIR := build
 
 include tests/test.mk
+include benches/bench.mk
 
 .PHONY: clean
 clean: ## Remove build directory
