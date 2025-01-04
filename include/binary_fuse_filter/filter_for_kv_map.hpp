@@ -309,7 +309,7 @@ public:
    *
    * @return The size in bytes.
    */
-  size_t serialized_num_bytes()
+  size_t serialized_num_bytes() const
   {
     return sizeof(seed) + sizeof(num_keys_in_kv_map) + sizeof(plaintext_modulo) + sizeof(label) + sizeof(segment_length) + sizeof(segment_count) +
            sizeof(segment_count_length) + sizeof(array_length) + (fingerprints.size() * sizeof(uint32_t));
@@ -321,7 +321,7 @@ public:
    * @param bytes The byte array to serialize to.
    * @return True if serialization was successful, false otherwise.
    */
-  bool serialize(std::span<uint8_t> bytes)
+  bool serialize(std::span<uint8_t> bytes) const
   {
     if (bytes.size() != serialized_num_bytes()) [[unlikely]] {
       return false;
@@ -363,7 +363,7 @@ public:
    * @param key The key to query.
    * @return The value associated with the key.
    */
-  uint32_t recover(const bff_kv_map_utils::bff_key_t key)
+  uint32_t recover(const bff_kv_map_utils::bff_key_t key) const
   {
     const uint64_t hash = bff_kv_map_utils::mix256(key.words, seed);
     const auto [h0, h1, h2] = hash_batch(hash);
