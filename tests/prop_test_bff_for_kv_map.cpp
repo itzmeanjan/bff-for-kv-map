@@ -140,3 +140,25 @@ TEST(BinaryFuseFIlterForKVMap, AttemptConstructionWithRepeatingKeys)
     EXPECT_EQ(std::memcmp(err.what(), expected_err_msg, expected_err_msg_len), 0);
   }
 }
+
+TEST(BinaryFuseFilterForKVMap, AttemptConstructionWithPlainTextModuloLesserThan256)
+{
+  constexpr size_t size = 100'000;
+  constexpr uint64_t plaintext_modulo = 255;
+  constexpr uint64_t label = 1;
+
+  auto seed = generate_random_seed();
+  std::vector<bff_kv_map_utils::bff_key_t> keys(size);
+  std::vector<uint32_t> values(size, 0);
+  generate_random_keys_and_values(keys, values, plaintext_modulo);
+
+  try {
+    bff_kv_map::bff_for_kv_map_t filter(seed, keys, values, plaintext_modulo, label);
+    EXPECT_TRUE(false);
+  } catch (std::runtime_error& err) {
+    constexpr auto expected_err_msg = "Plaintext modulo must be >= 256.";
+    const auto expected_err_msg_len = std::strlen(expected_err_msg);
+
+    EXPECT_EQ(std::memcmp(err.what(), expected_err_msg, expected_err_msg_len), 0);
+  }
+}
